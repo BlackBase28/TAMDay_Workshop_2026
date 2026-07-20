@@ -5,8 +5,8 @@
 # Target-side application layout.
 kernel_cve_radar_app_dir: /opt/cve-radar
 kernel_cve_radar_source_dir: "{{ kernel_cve_radar_app_dir }}/src"
-kernel_cve_radar_start_dir: "{{ kernel_cve_radar_source_dir }}/start"
-kernel_cve_radar_solution_dir: "{{ kernel_cve_radar_source_dir }}/solution"
+kernel_cve_radar_start_dir: "{{ kernel_cve_radar_source_dir }}/kernel-CVE-radar/start"
+kernel_cve_radar_solution_dir: "{{ kernel_cve_radar_source_dir }}/kernel-CVE-radar/solution"
 
 # Optional remote application repo.
 # When empty, sync_start/sync_solution playbooks use the existing local folder
