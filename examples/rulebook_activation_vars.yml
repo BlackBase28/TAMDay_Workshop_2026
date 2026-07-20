@@ -1,7 +1,0 @@
----
-# Optional Rulebook Activation Variables.
-# Omit these values to use the names embedded as Git defaults in the Rulebook.
-cve_radar_aap_organization: Default
-cve_radar_ai_job_template_name: CVE Radar - AI Risk Analysis
-cve_radar_web_remediation_workflow_name: CVE Radar - Governed Web Remediation
-cve_radar_suspicious_login_review_workflow_name: CVE Radar - Suspicious Login Review

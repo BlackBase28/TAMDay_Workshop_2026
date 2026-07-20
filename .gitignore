@@ -1,8 +1,4 @@
-*.retry
-*.pyc
 __pycache__/
-.venv/
-.env
+*.py[cod]
 *.log
-bootstrap-output*.csv
-students.csv
+.venv/
