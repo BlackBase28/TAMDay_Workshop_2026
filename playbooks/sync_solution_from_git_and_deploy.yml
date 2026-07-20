@@ -1,0 +1,11 @@
+---
+- name: AI/MCP remediation - Sync remote solution folder from Git and deploy fixed version
+  hosts: "{{ target_hosts | default('cve_radar', true) }}"
+  gather_facts: true
+  become: true
+  vars_files:
+    - ../vars/project_defaults.yml
+  vars:
+    kernel_cve_radar_remediation_action: sync_solution_from_git_and_deploy
+  roles:
+    - kernel_cve_radar_remediation

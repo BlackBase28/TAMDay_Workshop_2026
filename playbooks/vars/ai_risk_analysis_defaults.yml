@@ -1,0 +1,48 @@
+---
+# Non-sensitive defaults for CVE Radar - AI Risk Analysis.
+# Job Template Extra Variables can override any key with the same unprefixed name.
+cve_radar_ai_defaults:
+  ai_model_url: https://maas-rhdp.apps.maas.redhatworkshops.io/v1/chat/completions
+  ai_model: qwen3-14b
+  ai_validate_certs: false
+  ai_timeout: 180
+
+  rhel_mcp_url: http://192.168.1.110:8000/mcp
+  rhel_mcp_validate_certs: false
+  rhel_mcp_timeout: 30
+  rhel_mcp_sse_read_timeout: 300
+
+  governed_evidence_loop_enabled: true
+  governed_max_investigation_rounds: 3
+  governed_max_tool_calls_per_round: 5
+  governed_max_total_tool_calls: 10
+  governed_min_confidence_for_action: 0.60
+  governed_trust_structured_admin_trigger: true
+  governed_admin_trigger_confidence_floor: 0.85
+  governed_allowed_mcp_tools: read_log_file,get_journal_logs,get_service_status
+
+  governed_auth_log_tail_lines: 30
+  governed_access_log_tail_lines: 60
+  governed_error_log_tail_lines: 30
+  governed_max_log_lines: 60
+  governed_model_can_override_lines: false
+  governed_tool_result_max_chars: 4000
+  governed_max_evidence_chars: 12000
+
+  ai_model_max_retries: 1
+  ai_model_retry_delay_seconds: 1.5
+
+  ai_debug_trace: true
+  ai_debug_trace_include_mcp_results: true
+  ai_debug_trace_max_chars: 50000
+
+  ai_decision_event_enabled: true
+  ai_decision_event_dry_run: false
+  ai_decision_min_confidence: 0.70
+  ai_decision_event_auth_header: X-CVE-Radar-Token
+  ai_decision_event_timeout: 30
+  eda_event_stream_verify_tls: false
+
+  remediation_web_source_variant: solution
+  remediation_repair_branch: main
+  remediation_repair_commit: ""

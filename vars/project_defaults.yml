@@ -1,0 +1,27 @@
+---
+# Project-level defaults for AAP Job Templates.
+# AAP Extra Vars / Survey values can override these values.
+
+# Target-side application layout.
+kernel_cve_radar_app_dir: /opt/cve-radar
+kernel_cve_radar_source_dir: "{{ kernel_cve_radar_app_dir }}/src"
+kernel_cve_radar_start_dir: "{{ kernel_cve_radar_source_dir }}/start"
+kernel_cve_radar_solution_dir: "{{ kernel_cve_radar_source_dir }}/solution"
+
+# Optional remote application repo.
+# When empty, sync_start/sync_solution playbooks use the existing local folder
+# on the target VM: /opt/cve-radar/src/start or /opt/cve-radar/src/solution.
+kernel_cve_radar_repo_url: ""
+kernel_cve_radar_repo_version: main
+kernel_cve_radar_solution_sync_remote_folder: solution
+kernel_cve_radar_start_sync_remote_folder: start
+
+# Runtime settings.
+kernel_cve_radar_server_name: "{{ inventory_hostname }}"
+kernel_cve_radar_container_name: kernel-cve-radar
+kernel_cve_radar_backend_port: 8080
+kernel_cve_radar_container_port: 8000
+
+# Demo verification account.
+target_user: user1
+target_user_password: User1@tday

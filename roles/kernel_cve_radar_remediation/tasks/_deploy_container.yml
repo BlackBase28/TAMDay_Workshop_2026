@@ -1,0 +1,110 @@
+---
+- name: Find Containerfile candidates
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ kernel_cve_radar_container_build_context }}/Containerfile"
+    - "{{ kernel_cve_radar_container_build_context }}/deploy/Containerfile"
+  register: kernel_cve_radar_containerfile_candidates
+
+- name: Select Containerfile
+  ansible.builtin.set_fact:
+    kernel_cve_radar_containerfile: "{{ (kernel_cve_radar_containerfile_candidates.results | selectattr('stat.exists') | map(attribute='stat.path') | list | first) | default('') }}"
+
+- name: Fail when Containerfile is missing
+  ansible.builtin.fail:
+    msg: "No Containerfile found under {{ kernel_cve_radar_container_build_context }} or deploy/."
+  when: kernel_cve_radar_containerfile | length == 0
+
+- name: Prepare persistent data and log directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ kernel_cve_radar_container_uid }}"
+    group: "{{ kernel_cve_radar_container_gid }}"
+    mode: '0755'
+  loop:
+    - "{{ kernel_cve_radar_data_dir }}"
+    - "{{ kernel_cve_radar_log_dir }}"
+
+- name: Build Kernel CVE Radar container image
+  ansible.builtin.command:
+    argv:
+      - podman
+      - build
+      - -t
+      - "{{ kernel_cve_radar_container_image }}"
+      - -f
+      - "{{ kernel_cve_radar_containerfile }}"
+      - "{{ kernel_cve_radar_container_build_context }}"
+  register: kernel_cve_radar_build_result
+  changed_when: true
+
+- name: Remove canonical backend container if present
+  ansible.builtin.command:
+    argv:
+      - podman
+      - rm
+      - -f
+      - "{{ kernel_cve_radar_container_name }}"
+  register: kernel_cve_radar_remove_container
+  failed_when: false
+  changed_when: kernel_cve_radar_remove_container.rc == 0
+
+- name: Find containers publishing backend port
+  ansible.builtin.shell: >-
+    set -o pipefail;
+    podman ps -a --format '{{ '{{' }}.ID{{ '}}' }} {{ '{{' }}.Ports{{ '}}' }}'
+    | awk '/:{{ kernel_cve_radar_backend_port }}->/ {print $1}'
+  args:
+    executable: /bin/bash
+  register: kernel_cve_radar_port_containers
+  changed_when: false
+  when: kernel_cve_radar_container_remove_port_conflicts | bool
+
+- name: Remove containers publishing backend port
+  ansible.builtin.command:
+    argv:
+      - podman
+      - rm
+      - -f
+      - "{{ item }}"
+  loop: "{{ kernel_cve_radar_port_containers.stdout_lines | default([]) }}"
+  when: kernel_cve_radar_container_remove_port_conflicts | bool
+
+- name: Wait for backend port to be free
+  ansible.builtin.wait_for:
+    host: "{{ kernel_cve_radar_backend_bind_address }}"
+    port: "{{ kernel_cve_radar_backend_port }}"
+    state: stopped
+    timeout: 20
+
+- name: Run Kernel CVE Radar backend container
+  ansible.builtin.command:
+    argv:
+      - podman
+      - run
+      - -d
+      - --name
+      - "{{ kernel_cve_radar_container_name }}"
+      - --restart
+      - unless-stopped
+      - -p
+      - "{{ kernel_cve_radar_backend_bind_address }}:{{ kernel_cve_radar_backend_port }}:{{ kernel_cve_radar_container_port }}"
+      - -v
+      - "{{ kernel_cve_radar_data_dir }}:/data:Z"
+      - -v
+      - "{{ kernel_cve_radar_log_dir }}:/var/log/kernel-cve-radar:Z"
+      - "{{ kernel_cve_radar_container_image }}"
+  changed_when: true
+
+- name: Verify backend health after container deployment
+  ansible.builtin.uri:
+    url: "{{ kernel_cve_radar_backend_base_url }}{{ kernel_cve_radar_backend_health_path }}"
+    method: GET
+    status_code: [200]
+    return_content: true
+  register: kernel_cve_radar_backend_health
+  retries: 12
+  delay: 3
+  until: kernel_cve_radar_backend_health.status == 200

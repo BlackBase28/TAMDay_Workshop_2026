@@ -1,0 +1,129 @@
+---
+- name: Validate Event Stream settings
+  ansible.builtin.assert:
+    that:
+      - cve_radar_event_stream_url | trim | length > 0
+      - cve_radar_event_stream_token | trim | length > 0
+      - cve_radar_event_stream_auth_header | trim | length > 0
+    fail_msg: Provide the Event Stream sender URL, token, and header through AAP variables or a protected Credential.
+  no_log: true
+
+- name: Install ACL support
+  ansible.builtin.package:
+    name: acl
+    state: present
+
+- name: Create forwarder account
+  block:
+    - ansible.builtin.group:
+        name: "{{ cve_radar_forwarder_group }}"
+        system: true
+    - ansible.builtin.user:
+        name: "{{ cve_radar_forwarder_user }}"
+        group: "{{ cve_radar_forwarder_group }}"
+        system: true
+        shell: /sbin/nologin
+        home: "{{ cve_radar_forwarder_state_dir }}"
+        create_home: false
+
+- name: Preserve website ownership of application logs
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: "{{ item.state }}"
+    owner: "{{ cve_radar_application_log_owner }}"
+    group: "{{ cve_radar_application_log_group }}"
+    mode: "{{ item.mode }}"
+    modification_time: "{{ 'preserve' if item.state == 'touch' else omit }}"
+    access_time: "{{ 'preserve' if item.state == 'touch' else omit }}"
+  loop:
+    - {path: "{{ cve_radar_log_dir }}", state: directory, mode: "0750"}
+    - {path: "{{ cve_radar_auth_event_log }}", state: touch, mode: "0640"}
+    - {path: "{{ cve_radar_app_access_log }}", state: touch, mode: "0640"}
+
+- name: Grant forwarder access to application logs
+  ansible.posix.acl:
+    path: "{{ item.path }}"
+    entity: "{{ cve_radar_forwarder_user }}"
+    etype: user
+    permissions: "{{ item.permissions }}"
+    default: "{{ item.default | default(false) }}"
+    state: present
+  loop:
+    - {path: "{{ cve_radar_log_dir }}", permissions: rx}
+    - {path: "{{ cve_radar_log_dir }}", permissions: rx, default: true}
+    - {path: "{{ cve_radar_auth_event_log }}", permissions: r}
+    - {path: "{{ cve_radar_app_access_log }}", permissions: r}
+
+- name: Check httpd logs
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - /var/log/httpd
+    - "{{ cve_radar_httpd_access_log }}"
+    - "{{ cve_radar_httpd_ssl_access_log }}"
+  register: cve_radar_httpd_stats
+  when: cve_radar_web_access_enabled | bool
+
+- name: Grant forwarder access to available httpd paths
+  ansible.posix.acl:
+    path: "{{ item.item }}"
+    entity: "{{ cve_radar_forwarder_user }}"
+    etype: user
+    permissions: "{{ 'rx' if item.item == '/var/log/httpd' else 'r' }}"
+    default: "{{ item.item == '/var/log/httpd' }}"
+    state: present
+  loop: "{{ cve_radar_httpd_stats.results | default([]) }}"
+  when:
+    - cve_radar_web_access_enabled | bool
+    - item.stat.exists | default(false)
+
+- name: Create forwarder state directory
+  ansible.builtin.file:
+    path: "{{ cve_radar_forwarder_state_dir }}"
+    state: directory
+    owner: "{{ cve_radar_forwarder_user }}"
+    group: "{{ cve_radar_forwarder_group }}"
+    mode: "0700"
+
+- name: Install forwarder files
+  block:
+    - ansible.builtin.copy:
+        src: cve_radar_event_forwarder.py
+        dest: "{{ cve_radar_forwarder_script }}"
+        owner: root
+        group: root
+        mode: "0755"
+      notify: Restart CVE Radar EDA forwarder
+    - ansible.builtin.template:
+        src: cve-radar-eda-forwarder.env.j2
+        dest: "{{ cve_radar_forwarder_env_file }}"
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+      notify: Restart CVE Radar EDA forwarder
+    - ansible.builtin.template:
+        src: cve-radar-eda-forwarder.service.j2
+        dest: "/etc/systemd/system/{{ cve_radar_forwarder_service }}"
+        owner: root
+        group: root
+        mode: "0644"
+      notify:
+        - Reload systemd
+        - Restart CVE Radar EDA forwarder
+
+- name: Enable and start forwarder
+  ansible.builtin.systemd_service:
+    name: "{{ cve_radar_forwarder_service }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Apply handlers before validation
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify forwarder service
+  ansible.builtin.command: "systemctl is-active {{ cve_radar_forwarder_service }}"
+  register: cve_radar_forwarder_active
+  changed_when: false
+  failed_when: cve_radar_forwarder_active.stdout | trim != 'active'

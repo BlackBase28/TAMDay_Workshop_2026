@@ -1,0 +1,52 @@
+---
+- name: Disable active maintenance httpd config
+  ansible.builtin.command: >-
+    mv {{ kernel_cve_radar_httpd_maintenance_conf }}
+    {{ kernel_cve_radar_httpd_maintenance_conf }}.disabled-by-remediation-{{ ansible_date_time.epoch }}
+  args:
+    removes: "{{ kernel_cve_radar_httpd_maintenance_conf }}"
+
+- name: Check disabled normal httpd config
+  ansible.builtin.stat:
+    path: "{{ kernel_cve_radar_httpd_normal_disabled_conf }}"
+  register: kernel_cve_radar_disabled_normal_conf_stat
+
+- name: Restore original normal httpd config
+  ansible.builtin.command: >-
+    mv {{ kernel_cve_radar_httpd_normal_disabled_conf }} {{ kernel_cve_radar_httpd_normal_conf }}
+  args:
+    removes: "{{ kernel_cve_radar_httpd_normal_disabled_conf }}"
+  when: kernel_cve_radar_disabled_normal_conf_stat.stat.exists
+
+- name: Confirm normal httpd config exists
+  ansible.builtin.stat:
+    path: "{{ kernel_cve_radar_httpd_normal_conf }}"
+  register: kernel_cve_radar_normal_conf_after_restore_stat
+
+- name: Fail when normal httpd config is unavailable
+  ansible.builtin.fail:
+    msg: >-
+      Normal httpd config is not active at {{ kernel_cve_radar_httpd_normal_conf }} and
+      {{ kernel_cve_radar_httpd_normal_disabled_conf }} was not found.
+  when: not kernel_cve_radar_normal_conf_after_restore_stat.stat.exists
+
+- name: Validate httpd config
+  ansible.builtin.command: apachectl configtest
+  changed_when: false
+
+- name: Reload httpd into normal mode
+  ansible.builtin.service:
+    name: "{{ kernel_cve_radar_httpd_service }}"
+    state: reloaded
+
+- name: Verify public health endpoint
+  ansible.builtin.uri:
+    url: "{{ kernel_cve_radar_public_base_url }}{{ kernel_cve_radar_backend_health_path }}"
+    method: GET
+    validate_certs: "{{ kernel_cve_radar_validate_certs }}"
+    status_code: [200]
+    return_content: true
+  register: kernel_cve_radar_public_health
+  retries: 10
+  delay: 3
+  until: kernel_cve_radar_public_health.status == 200

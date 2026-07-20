@@ -1,0 +1,39 @@
+---
+- name: Send Slack alert through incoming webhook
+  ansible.builtin.uri:
+    url: "{{ kernel_cve_radar_slack_webhook_url }}"
+    method: POST
+    body_format: json
+    body:
+      channel: "{{ kernel_cve_radar_slack_channel | default(omit, true) }}"
+      username: "{{ kernel_cve_radar_slack_username }}"
+      icon_emoji: "{{ kernel_cve_radar_slack_icon_emoji }}"
+      text: "{{ kernel_cve_radar_slack_message }}"
+    status_code: [200]
+    return_content: true
+  no_log: true
+  when: kernel_cve_radar_slack_method == 'webhook'
+
+- name: Send Slack alert through Bot API
+  ansible.builtin.uri:
+    url: https://slack.com/api/chat.postMessage
+    method: POST
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ kernel_cve_radar_slack_bot_token }}"
+      Content-Type: application/json
+    body:
+      channel: "{{ kernel_cve_radar_slack_channel }}"
+      text: "{{ kernel_cve_radar_slack_message }}"
+    status_code: [200]
+    return_content: true
+  register: kernel_cve_radar_slack_api_response
+  no_log: true
+  when: kernel_cve_radar_slack_method == 'api'
+
+- name: Validate Slack Bot API response
+  ansible.builtin.assert:
+    that:
+      - (kernel_cve_radar_slack_api_response.json.ok | default(false)) | bool
+    fail_msg: "Slack Bot API returned an error. Check SLACK_BOT_TOKEN and channel."
+  when: kernel_cve_radar_slack_method == 'api'

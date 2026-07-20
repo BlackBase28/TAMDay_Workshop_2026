@@ -1,0 +1,125 @@
+---
+- name: Create maintenance document root
+  ansible.builtin.file:
+    path: "{{ kernel_cve_radar_maintenance_document_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Check source maintenance page
+  ansible.builtin.stat:
+    path: "{{ kernel_cve_radar_maintenance_page_src }}"
+  register: kernel_cve_radar_maintenance_source_stat
+
+- name: Copy maintenance page from start folder
+  ansible.builtin.copy:
+    src: "{{ kernel_cve_radar_maintenance_page_src }}"
+    dest: "{{ kernel_cve_radar_maintenance_document_root }}/maintenance.html"
+    remote_src: true
+    owner: root
+    group: root
+    mode: '0644'
+  when: kernel_cve_radar_maintenance_source_stat.stat.exists
+
+- name: Create fallback maintenance page when source page is missing
+  ansible.builtin.copy:
+    content: "{{ kernel_cve_radar_maintenance_fallback_html }}"
+    dest: "{{ kernel_cve_radar_maintenance_document_root }}/maintenance.html"
+    owner: root
+    group: root
+    mode: '0644'
+  when: not kernel_cve_radar_maintenance_source_stat.stat.exists
+
+- name: Create index.html for maintenance document root
+  ansible.builtin.copy:
+    src: "{{ kernel_cve_radar_maintenance_document_root }}/maintenance.html"
+    dest: "{{ kernel_cve_radar_maintenance_document_root }}/index.html"
+    remote_src: true
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Create static maintenance health endpoint
+  ansible.builtin.copy:
+    content: "ok
+"
+    dest: "{{ kernel_cve_radar_maintenance_document_root }}/healthz"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Check demo SSL certificate
+  ansible.builtin.stat:
+    path: "{{ kernel_cve_radar_ssl_cert_file }}"
+  register: kernel_cve_radar_ssl_cert_stat
+
+- name: Generate demo SSL certificate if missing
+  ansible.builtin.command:
+    argv:
+      - openssl
+      - req
+      - -x509
+      - -nodes
+      - -newkey
+      - rsa:2048
+      - -days
+      - '365'
+      - -subj
+      - "/CN={{ kernel_cve_radar_server_name }}"
+      - -keyout
+      - "{{ kernel_cve_radar_ssl_key_file }}"
+      - -out
+      - "{{ kernel_cve_radar_ssl_cert_file }}"
+  when:
+    - kernel_cve_radar_generate_demo_ssl_cert | bool
+    - not kernel_cve_radar_ssl_cert_stat.stat.exists
+
+- name: Check active normal httpd config
+  ansible.builtin.stat:
+    path: "{{ kernel_cve_radar_httpd_normal_conf }}"
+  register: kernel_cve_radar_normal_conf_stat
+
+- name: Move stale disabled normal config aside
+  ansible.builtin.command: >-
+    mv {{ kernel_cve_radar_httpd_normal_disabled_conf }}
+    {{ kernel_cve_radar_httpd_normal_disabled_conf }}.stale-{{ ansible_date_time.epoch }}
+  args:
+    removes: "{{ kernel_cve_radar_httpd_normal_disabled_conf }}"
+  when: kernel_cve_radar_normal_conf_stat.stat.exists
+
+- name: Disable active normal httpd config
+  ansible.builtin.command: >-
+    mv {{ kernel_cve_radar_httpd_normal_conf }} {{ kernel_cve_radar_httpd_normal_disabled_conf }}
+  args:
+    removes: "{{ kernel_cve_radar_httpd_normal_conf }}"
+  when: kernel_cve_radar_normal_conf_stat.stat.exists
+
+- name: Install maintenance httpd config
+  ansible.builtin.template:
+    src: kernel-cve-radar-maintenance.conf.j2
+    dest: "{{ kernel_cve_radar_httpd_maintenance_conf }}"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Validate httpd config
+  ansible.builtin.command: apachectl configtest
+  changed_when: false
+
+- name: Reload httpd into maintenance mode
+  ansible.builtin.service:
+    name: "{{ kernel_cve_radar_httpd_service }}"
+    state: reloaded
+
+- name: Verify login path is handled by maintenance mode
+  ansible.builtin.uri:
+    url: "{{ kernel_cve_radar_public_base_url }}{{ kernel_cve_radar_maintenance_check_path }}"
+    method: GET
+    validate_certs: "{{ kernel_cve_radar_validate_certs }}"
+    status_code: "{{ kernel_cve_radar_maintenance_expected_status_codes }}"
+    return_content: true
+  register: kernel_cve_radar_maintenance_check
+  retries: 6
+  delay: 2
+  until: kernel_cve_radar_maintenance_check.status in kernel_cve_radar_maintenance_expected_status_codes

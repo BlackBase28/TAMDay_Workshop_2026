@@ -1,0 +1,13 @@
+---
+- name: AI/MCP remediation - Verify Kernel CVE Radar web repair
+  hosts: "{{ target_hosts | default('cve_radar', true) }}"
+  gather_facts: true
+  become: true
+  vars_files:
+    - ../vars/project_defaults.yml
+  vars:
+    kernel_cve_radar_remediation_action: verify_fixed_site
+    # auto: use backend checks while maintenance mode is active; use public checks after restore.
+    kernel_cve_radar_verify_stage: auto
+  roles:
+    - kernel_cve_radar_remediation

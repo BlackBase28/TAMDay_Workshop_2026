@@ -1,0 +1,190 @@
+---
+- name: CVE Radar governed security investigation and action routing
+  hosts: all
+  sources:
+    # AAP 2.5/2.6 Simplified Event Routing replaces this webhook source with
+    # the Event Stream source mapping when the activation is created.
+    - name: cve_radar_event_stream
+      ansible.eda.webhook:
+        host: 0.0.0.0
+        port: 5000
+
+  rules:
+    - name: Route AI proposal to governed web remediation Workflow
+      condition: >-
+        event.payload.schema_version == "kernel-cve-radar.ai-decision.v1"
+        and event.payload.event_key == "kernel-cve-radar.ai.remediation.proposed"
+        and event.payload.event_source == "ai_analysis"
+        and event.payload.routing is defined
+        and event.payload.routing.approved == true
+        and event.payload.routing.workflow_key == "governed_web_remediation"
+        and event.payload.assessment in ["suspicious", "highly_suspicious"]
+        and event.payload.incident_type in ["broken_access_control", "admin_content_exposure"]
+        and event.payload.recommended_next_step == "repair_web_code"
+        and event.payload.target_host is defined
+        and event.payload.target_host != ""
+      action:
+        run_workflow_template:
+          name: "{{ cve_radar_web_remediation_workflow_name | default('CVE Radar - Governed Web Remediation') }}"
+          organization: "{{ cve_radar_aap_organization | default('Default') }}"
+          include_events: false
+          retries: 2
+          delay: 5
+          job_args:
+            limit: "{{ event.payload.target_host }}"
+            extra_vars:
+              target_host: "{{ event.payload.target_host }}"
+              investigation_id: "{{ event.payload.investigation_id }}"
+              remediation_action: repair_web_code
+              remediation_web_source_variant: >-
+                {{ event.payload.handoff.web_source_variant | default('solution') }}
+              remediation_repair_branch: >-
+                {{ event.payload.handoff.repair_branch | default('main') }}
+              remediation_repair_commit: >-
+                {{ event.payload.handoff.repair_commit | default('') }}
+              ai_confidence: "{{ event.payload.confidence }}"
+              ai_reason: "{{ event.payload.reason | default('') }}"
+
+    - name: Route AI proposal to suspicious login review Workflow
+      condition: >-
+        event.payload.schema_version == "kernel-cve-radar.ai-decision.v1"
+        and event.payload.event_key == "kernel-cve-radar.ai.review.proposed"
+        and event.payload.event_source == "ai_analysis"
+        and event.payload.routing is defined
+        and event.payload.routing.approved == true
+        and event.payload.routing.workflow_key == "suspicious_login_review"
+        and event.payload.assessment in ["suspicious", "highly_suspicious"]
+        and event.payload.incident_type in ["suspicious_login_success", "possible_account_compromise"]
+        and event.payload.recommended_next_step == "require_approval"
+        and event.payload.target_host is defined
+        and event.payload.target_host != ""
+      action:
+        run_workflow_template:
+          name: "{{ cve_radar_suspicious_login_review_workflow_name | default('CVE Radar - Suspicious Login Review') }}"
+          organization: "{{ cve_radar_aap_organization | default('Default') }}"
+          include_events: false
+          retries: 2
+          delay: 5
+          job_args:
+            extra_vars:
+              target_host: "{{ event.payload.target_host }}"
+              investigation_id: "{{ event.payload.investigation_id }}"
+              review_action: require_human_review
+              affected_user: "{{ event.payload.affected_user | default('') }}"
+              source_ips: "{{ event.payload.source_ips | default([]) }}"
+              login_failure_count: >-
+                {{ event.payload.trigger_context.failure_count | default(0) }}
+              login_failure_threshold: >-
+                {{ event.payload.trigger_context.failure_threshold | default(3) }}
+              login_window_seconds: >-
+                {{ event.payload.trigger_context.failure_window_seconds | default(0) }}
+              login_window_start: >-
+                {{ event.payload.trigger_context.window_start | default('') }}
+              login_success_at: >-
+                {{ event.payload.trigger_context.success_at | default('') }}
+              post_login_harmful_activity_observed: >-
+                {{ event.payload.review.post_login_harmful_activity_observed | default(false) }}
+              ai_assessment: "{{ event.payload.assessment }}"
+              ai_incident_type: "{{ event.payload.incident_type }}"
+              ai_confidence: "{{ event.payload.confidence }}"
+              ai_reason: "{{ event.payload.reason | default('') }}"
+              ai_evidence_summary: "{{ event.payload.evidence_summary | default([]) }}"
+              workflow_review_summary: >-
+                {{ event.payload.workflow_review_summary | default('') }}
+              login_failures: >-
+                {{ event.payload.trigger_context.failures | default([]) }}
+
+    - name: Detect non-admin access to admin content
+      condition: >-
+        (event.payload.event_key == "kernel-cve-radar.authorization.admin.access"
+        or event.payload.event_key == "kernel-cve-radar.authorization.admin_content.exposure")
+        and event.payload.event_source == "application_auth_log"
+        and event.payload.collector is defined
+        and event.payload.collector.hostname is defined
+        and event.payload.collector.hostname != ""
+        and event.payload.collector.source_file == "/var/log/kernel-cve-radar/auth-events.jsonl"
+        and event.payload.username is defined
+        and event.payload.username != ""
+        and event.payload.user_role is defined
+        and event.payload.user_role != ""
+        and event.payload.user_role != "admin"
+        and event.payload.event_outcome == "allowed"
+        and ((event.payload.url_path is defined and event.payload.url_path == "/admin")
+        or (event.payload.http_path is defined and event.payload.http_path == "/admin"))
+      throttle:
+        once_within: 1 minute
+        group_by_attributes:
+          - event.payload.collector.hostname
+          - event.payload.username
+          - event.payload.url_path
+      action:
+        run_job_template:
+          name: "{{ cve_radar_ai_job_template_name | default('CVE Radar - AI Risk Analysis') }}"
+          organization: "{{ cve_radar_aap_organization | default('Default') }}"
+          job_args:
+            extra_vars:
+              trigger_event: "{{ event.payload }}"
+              investigation_lookback_minutes: 10
+              detection_context:
+                scenario: broken_access_control
+                expected_follow_up: repair_web_code
+                correlation_field: username
+                correlation_value: "{{ event.payload.username }}"
+                description: >-
+                  A non-admin user was allowed to access admin-only content.
+                  AI should confirm the evidence and propose a controlled code repair.
+
+    - name: Investigate every successful admin login
+      condition: >-
+        event.payload.event_key == "kernel-cve-radar.authentication.admin.login.success"
+        and event.payload.event_source == "application_auth_log"
+        and event.payload.collector is defined
+        and event.payload.collector.hostname is defined
+        and event.payload.collector.hostname != ""
+        and event.payload.collector.source_file == "/var/log/kernel-cve-radar/auth-events.jsonl"
+        and event.payload.username is defined
+        and event.payload.username == "admin"
+        and event.payload.event_outcome == "success"
+      action:
+        run_job_template:
+          name: "{{ cve_radar_ai_job_template_name | default('CVE Radar - AI Risk Analysis') }}"
+          organization: "{{ cve_radar_aap_organization | default('Default') }}"
+          job_args:
+            extra_vars:
+              trigger_event: "{{ event.payload }}"
+              investigation_lookback_minutes: 5
+              detection_context:
+                scenario: admin_login_success
+                detection_threshold: 3
+                detection_window_seconds: 300
+                correlation_field: username
+                correlation_value: "{{ event.payload.username }}"
+                expected_follow_up: require_approval_when_threshold_met
+                description: >-
+                  The admin account logged in successfully. AI must use RHEL MCP
+                  to inspect the authentication log for the five minutes before
+                  this success and determine whether at least three admin login
+                  failures occurred. The trigger itself is not a security verdict.
+                  If the threshold is met, require human review; otherwise observe
+                  without starting a review Workflow. Never lock the account or
+                  make system changes automatically.
+
+    - name: Diagnose unrouted AI action proposal
+      condition: >-
+        event.payload.schema_version == "kernel-cve-radar.ai-decision.v1"
+        and event.payload.event_key in [
+          "kernel-cve-radar.ai.remediation.proposed",
+          "kernel-cve-radar.ai.review.proposed"
+        ]
+        and event.payload.event_source == "ai_analysis"
+      action:
+        debug:
+          msg: >-
+            AI proposal reached the Activation but did not match an approved
+            Workflow route. event_id={{ event.payload.event_id | default('missing') }},
+            target={{ event.payload.target_host | default('missing') }},
+            action={{ event.payload.recommended_next_step | default('missing') }},
+            approved={{ event.payload.routing.approved | default('missing') }},
+            workflow_key={{ event.payload.routing.workflow_key | default('missing') }},
+            assessment={{ event.payload.assessment | default('missing') }},
+            incident_type={{ event.payload.incident_type | default('missing') }}.

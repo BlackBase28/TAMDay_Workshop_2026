@@ -1,0 +1,41 @@
+---
+- name: Show solution source selection
+  ansible.builtin.debug:
+    msg: >-
+      {{ 'Syncing solution/ from remote Git repo ' ~ kernel_cve_radar_repo_url ~ ' revision ' ~ kernel_cve_radar_repo_version
+         if (kernel_cve_radar_repo_url | default('', true) | length > 0)
+         else 'Using existing local solution folder on target VM: ' ~ kernel_cve_radar_solution_dir }}
+
+- name: Sync solution folder from remote Git repo when repo URL is set
+  ansible.builtin.include_tasks: _sync_git_folder.yml
+  vars:
+    kernel_cve_radar_sync_temp_dir: "{{ kernel_cve_radar_solution_sync_temp_dir }}"
+    kernel_cve_radar_sync_remote_folder: "{{ kernel_cve_radar_solution_sync_remote_folder }}"
+    kernel_cve_radar_sync_dest_dir: "{{ kernel_cve_radar_solution_dir }}"
+  when: kernel_cve_radar_repo_url | default('', true) | length > 0
+
+- name: Check existing local solution folder when repo URL is not set
+  ansible.builtin.stat:
+    path: "{{ kernel_cve_radar_solution_dir }}"
+  register: kernel_cve_radar_local_solution_stat
+  when: kernel_cve_radar_repo_url | default('', true) | length == 0
+
+- name: Fail when local solution folder is unavailable
+  ansible.builtin.fail:
+    msg: >-
+      kernel_cve_radar_repo_url is not set, so this playbook will use the target VM's existing
+      local solution folder. The folder does not exist: {{ kernel_cve_radar_solution_dir }}.
+      Set kernel_cve_radar_repo_url or deploy the application source first.
+  when:
+    - kernel_cve_radar_repo_url | default('', true) | length == 0
+    - not kernel_cve_radar_local_solution_stat.stat.isdir | default(false)
+
+- name: Deploy solution container
+  ansible.builtin.include_tasks: _deploy_container.yml
+  vars:
+    kernel_cve_radar_container_build_context: "{{ kernel_cve_radar_solution_dir }}"
+    kernel_cve_radar_container_image: "{{ kernel_cve_radar_solution_container_image }}"
+
+- name: Optionally restore site after solution deployment
+  ansible.builtin.include_tasks: restore_site.yml
+  when: kernel_cve_radar_restore_after_solution_deploy | bool

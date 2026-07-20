@@ -1,0 +1,127 @@
+---
+- name: Inspect normal Apache config state
+  ansible.builtin.stat:
+    path: "{{ kernel_cve_radar_httpd_normal_conf }}"
+  register: kernel_cve_radar_verify_normal_conf_stat
+  when: kernel_cve_radar_verify_stage == 'auto'
+
+- name: Inspect maintenance Apache config state
+  ansible.builtin.stat:
+    path: "{{ kernel_cve_radar_httpd_maintenance_conf }}"
+  register: kernel_cve_radar_verify_maintenance_conf_stat
+  when: kernel_cve_radar_verify_stage == 'auto'
+
+- name: Resolve automatic verification stage
+  ansible.builtin.set_fact:
+    kernel_cve_radar_effective_verify_stage: >-
+      {{ 'pre_restore'
+         if (kernel_cve_radar_verify_maintenance_conf_stat.stat.exists | default(false))
+         else 'post_restore' }}
+  when: kernel_cve_radar_verify_stage == 'auto'
+
+- name: Use requested verification stage
+  ansible.builtin.set_fact:
+    kernel_cve_radar_effective_verify_stage: "{{ kernel_cve_radar_verify_stage }}"
+  when: kernel_cve_radar_verify_stage != 'auto'
+
+- name: Resolve verification base URL
+  ansible.builtin.set_fact:
+    kernel_cve_radar_verify_base_url: >-
+      {{ kernel_cve_radar_backend_base_url if kernel_cve_radar_effective_verify_stage == 'pre_restore' else kernel_cve_radar_public_base_url }}
+    kernel_cve_radar_verify_tls: "{{ false if kernel_cve_radar_effective_verify_stage == 'pre_restore' else kernel_cve_radar_validate_certs }}"
+
+- name: Show verification target
+  ansible.builtin.debug:
+    msg:
+      requested_stage: "{{ kernel_cve_radar_verify_stage }}"
+      effective_stage: "{{ kernel_cve_radar_effective_verify_stage }}"
+      base_url: "{{ kernel_cve_radar_verify_base_url }}"
+      note: >-
+        {{ 'Maintenance config is active, so repair verification uses the local backend before restore.'
+           if kernel_cve_radar_effective_verify_stage == 'pre_restore'
+           else 'Normal public site verification is used after restore.' }}
+
+- name: Verify health endpoint
+  ansible.builtin.uri:
+    url: "{{ kernel_cve_radar_verify_base_url }}{{ kernel_cve_radar_backend_health_path }}"
+    method: GET
+    validate_certs: "{{ kernel_cve_radar_verify_tls }}"
+    status_code: [200]
+    return_content: true
+  register: kernel_cve_radar_verify_health
+  retries: 10
+  delay: 3
+  until: kernel_cve_radar_verify_health.status == 200
+
+- name: Load home page for fixed marker check
+  ansible.builtin.uri:
+    url: "{{ kernel_cve_radar_verify_base_url }}/"
+    method: GET
+    validate_certs: "{{ kernel_cve_radar_verify_tls }}"
+    status_code: [200]
+    return_content: true
+  register: kernel_cve_radar_verify_home
+  when: kernel_cve_radar_check_fixed_marker | bool
+
+- name: Fail when fixed marker is missing
+  ansible.builtin.fail:
+    msg: "Fixed marker '{{ kernel_cve_radar_fixed_marker }}' was not found on {{ kernel_cve_radar_verify_base_url }}/."
+  when:
+    - kernel_cve_radar_check_fixed_marker | bool
+    - kernel_cve_radar_fixed_marker not in kernel_cve_radar_verify_home.content
+
+- name: Open login page to receive initial cookies
+  ansible.builtin.uri:
+    url: "{{ kernel_cve_radar_verify_base_url }}/login"
+    method: GET
+    validate_certs: "{{ kernel_cve_radar_verify_tls }}"
+    status_code: [200]
+    return_content: true
+  register: kernel_cve_radar_login_get
+  when: kernel_cve_radar_verify_admin_access_control | bool
+
+- name: Login as regular user for admin access verification
+  ansible.builtin.uri:
+    url: "{{ kernel_cve_radar_verify_base_url }}/login"
+    method: POST
+    validate_certs: "{{ kernel_cve_radar_verify_tls }}"
+    body_format: form-urlencoded
+    body:
+      username: "{{ kernel_cve_radar_verify_regular_username }}"
+      password: "{{ kernel_cve_radar_verify_regular_password }}"
+    headers:
+      Cookie: "{{ kernel_cve_radar_login_get.cookies_string | default('') }}"
+    follow_redirects: all
+    status_code: [200, 302]
+    return_content: true
+  register: kernel_cve_radar_regular_login
+  when: kernel_cve_radar_verify_admin_access_control | bool
+
+- name: Try accessing admin page as regular user
+  ansible.builtin.uri:
+    url: "{{ kernel_cve_radar_verify_base_url }}/admin"
+    method: GET
+    validate_certs: "{{ kernel_cve_radar_verify_tls }}"
+    headers:
+      Cookie: "{{ kernel_cve_radar_regular_login.cookies_string | default(kernel_cve_radar_login_get.cookies_string | default('')) }}"
+    follow_redirects: none
+    status_code: [200, 302, 401, 403]
+    return_content: true
+  register: kernel_cve_radar_regular_admin
+  when: kernel_cve_radar_verify_admin_access_control | bool
+
+- name: Fail if regular user can access admin page
+  ansible.builtin.fail:
+    msg: "Regular user {{ kernel_cve_radar_verify_regular_username }} can still access /admin with HTTP 200."
+  when:
+    - kernel_cve_radar_verify_admin_access_control | bool
+    - kernel_cve_radar_regular_admin.status == 200
+
+- name: Show verification summary
+  ansible.builtin.debug:
+    msg:
+      requested_stage: "{{ kernel_cve_radar_verify_stage }}"
+      effective_stage: "{{ kernel_cve_radar_effective_verify_stage }}"
+      base_url: "{{ kernel_cve_radar_verify_base_url }}"
+      health_status: "{{ kernel_cve_radar_verify_health.status }}"
+      admin_status_as_regular_user: "{{ kernel_cve_radar_regular_admin.status | default('skipped') }}"

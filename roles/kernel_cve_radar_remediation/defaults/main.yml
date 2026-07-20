@@ -1,0 +1,80 @@
+---
+# Canonical project layout on the target VM.
+kernel_cve_radar_app_dir: /opt/cve-radar
+kernel_cve_radar_source_dir: "{{ kernel_cve_radar_app_dir }}/src"
+kernel_cve_radar_start_dir: "{{ kernel_cve_radar_source_dir }}/start"
+kernel_cve_radar_solution_dir: "{{ kernel_cve_radar_source_dir }}/solution"
+
+# Git source for start/solution application code. Keep this separate from the
+# AAP Project repo that contains these playbooks.
+kernel_cve_radar_repo_url: ""
+kernel_cve_radar_repo_version: main
+kernel_cve_radar_solution_sync_remote_folder: solution
+kernel_cve_radar_start_sync_remote_folder: start
+kernel_cve_radar_solution_sync_temp_dir: /tmp/kernel-cve-radar-solution-sync
+kernel_cve_radar_start_sync_temp_dir: /tmp/kernel-cve-radar-start-sync
+
+# Apache mode-switch files.
+kernel_cve_radar_httpd_normal_conf: /etc/httpd/conf.d/cve-radar.conf
+kernel_cve_radar_httpd_normal_disabled_conf: /etc/httpd/conf.d/cve-radar.conf.disabled-by-remediation
+kernel_cve_radar_httpd_maintenance_conf: /etc/httpd/conf.d/kernel-cve-radar.conf
+kernel_cve_radar_httpd_service: httpd
+kernel_cve_radar_server_name: "{{ inventory_hostname }}"
+kernel_cve_radar_public_scheme: https
+kernel_cve_radar_validate_certs: false
+kernel_cve_radar_public_base_url: "{{ kernel_cve_radar_public_scheme }}://{{ kernel_cve_radar_server_name }}"
+
+# Maintenance page.
+kernel_cve_radar_maintenance_document_root: /var/www/kernel-cve-radar-maintenance
+kernel_cve_radar_maintenance_page_src: "{{ kernel_cve_radar_start_dir }}/deploy/maintenance/maintenance.html"
+kernel_cve_radar_maintenance_fallback_html: |
+  <!doctype html>
+  <html><head><title>Maintenance</title></head>
+  <body><h1>Kernel CVE Radar is under maintenance</h1></body></html>
+kernel_cve_radar_maintenance_status_code: 503
+kernel_cve_radar_maintenance_retry_after: 300
+kernel_cve_radar_maintenance_check_path: /login
+kernel_cve_radar_maintenance_expected_status_codes: [200, 503]
+
+# Demo SSL certificate used only when the target lab VM does not already have one.
+kernel_cve_radar_ssl_cert_file: /etc/pki/tls/certs/kernel-cve-radar.crt
+kernel_cve_radar_ssl_key_file: /etc/pki/tls/private/kernel-cve-radar.key
+kernel_cve_radar_generate_demo_ssl_cert: true
+
+# Container deployment. Keep the backend container name stable for all playbooks.
+kernel_cve_radar_canonical_container_name: kernel-cve-radar
+kernel_cve_radar_container_name: kernel-cve-radar
+kernel_cve_radar_container_port: 8000
+kernel_cve_radar_backend_bind_address: 127.0.0.1
+kernel_cve_radar_backend_port: 8080
+kernel_cve_radar_backend_base_url: "http://{{ kernel_cve_radar_backend_bind_address }}:{{ kernel_cve_radar_backend_port }}"
+kernel_cve_radar_backend_health_path: /healthz
+kernel_cve_radar_data_dir: /var/lib/kernel-cve-radar
+kernel_cve_radar_log_dir: /var/log/kernel-cve-radar
+kernel_cve_radar_container_uid: 1001
+kernel_cve_radar_container_gid: 1001
+kernel_cve_radar_solution_container_image: localhost/kernel-cve-radar:solution
+kernel_cve_radar_start_container_image: localhost/kernel-cve-radar:start
+kernel_cve_radar_container_remove_port_conflicts: true
+
+# Workflow behavior.
+kernel_cve_radar_restore_after_solution_deploy: false
+kernel_cve_radar_restore_after_start_deploy: true
+
+# Verification.
+kernel_cve_radar_verify_stage: auto
+kernel_cve_radar_fixed_marker: Fixed version
+kernel_cve_radar_check_fixed_marker: true
+kernel_cve_radar_verify_admin_access_control: true
+kernel_cve_radar_verify_regular_username: "{{ target_user | default('user1', true) }}"
+kernel_cve_radar_verify_regular_password: "{{ target_user_password | default('User1@tday', true) }}"
+kernel_cve_radar_expected_regular_user_admin_denied_status_codes: [401, 403, 302]
+
+# Slack notification. Prefer injecting secrets through AAP credentials/environment.
+kernel_cve_radar_slack_method: webhook
+kernel_cve_radar_slack_channel: ""
+kernel_cve_radar_slack_message: "Kernel CVE Radar remediation workflow notification."
+kernel_cve_radar_slack_username: Kernel CVE Radar Bot
+kernel_cve_radar_slack_icon_emoji: ":satellite:"
+kernel_cve_radar_slack_webhook_url: "{{ lookup('env', 'SLACK_WEBHOOK_URL') | default('', true) }}"
+kernel_cve_radar_slack_bot_token: "{{ lookup('env', 'SLACK_BOT_TOKEN') | default('', true) }}"

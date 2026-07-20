@@ -1,0 +1,57 @@
+---
+- name: Record the governed suspicious login review
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Validate suspicious login review input
+      ansible.builtin.assert:
+        that:
+          - target_host | default('') | length > 0
+          - investigation_id | default('') | length > 0
+          - affected_user | default('') | length > 0
+          - review_action | default('') == 'require_human_review'
+        fail_msg: >-
+          This Job Template must be launched by the CVE Radar suspicious login
+          review Workflow with the governed review variables.
+
+    - name: Show the review record
+      ansible.builtin.debug:
+        msg:
+          review_status: recorded
+          review_action: "{{ review_action }}"
+          investigation_id: "{{ investigation_id }}"
+          target_host: "{{ target_host }}"
+          affected_user: "{{ affected_user }}"
+          source_ips: "{{ source_ips | default([]) }}"
+          login_failure_count: "{{ login_failure_count | default(0) | int }}"
+          login_failure_threshold: "{{ login_failure_threshold | default(3) | int }}"
+          login_window_seconds: "{{ login_window_seconds | default(0) | int }}"
+          login_window_start: "{{ login_window_start | default('') }}"
+          login_success_at: "{{ login_success_at | default('') }}"
+          post_login_harmful_activity_observed: >-
+            {{ post_login_harmful_activity_observed | default(false) | bool }}
+          ai_assessment: "{{ ai_assessment | default('unknown') }}"
+          ai_incident_type: "{{ ai_incident_type | default('unknown') }}"
+          ai_confidence: "{{ ai_confidence | default(0) | float }}"
+          ai_reason: "{{ ai_reason | default('') }}"
+          ai_evidence_summary: "{{ ai_evidence_summary | default([]) }}"
+          workflow_review_summary: "{{ workflow_review_summary | default('') }}"
+          login_failures: "{{ login_failures | default([]) }}"
+          automatic_account_action: false
+          note: >-
+            This playbook records the review context only. Account locking,
+            source blocking, and system changes are intentionally excluded.
+
+    - name: Publish the review record for downstream Workflow nodes
+      ansible.builtin.set_stats:
+        data:
+          cve_radar_login_review_recorded: true
+          cve_radar_login_review_investigation_id: "{{ investigation_id }}"
+          cve_radar_login_review_target_host: "{{ target_host }}"
+          cve_radar_login_review_user: "{{ affected_user }}"
+          cve_radar_login_review_summary: "{{ workflow_review_summary | default('') }}"
+          cve_radar_login_review_failures: "{{ login_failures | default([]) }}"
+          cve_radar_login_review_requires_human_approval: true
+          cve_radar_login_review_automatic_account_action: false
+        per_host: false

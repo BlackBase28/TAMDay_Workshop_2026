@@ -1,0 +1,9 @@
+---
+- name: Reload systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+- name: Restart CVE Radar EDA forwarder
+  ansible.builtin.systemd_service:
+    name: cve-radar-eda-forwarder.service
+    state: restarted

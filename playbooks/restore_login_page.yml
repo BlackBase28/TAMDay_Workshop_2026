@@ -1,0 +1,11 @@
+---
+- name: AI/MCP remediation - Restore Kernel CVE Radar normal site
+  hosts: "{{ target_hosts | default('cve_radar', true) }}"
+  gather_facts: true
+  become: true
+  vars_files:
+    - ../vars/project_defaults.yml
+  vars:
+    kernel_cve_radar_remediation_action: restore_site
+  roles:
+    - kernel_cve_radar_remediation

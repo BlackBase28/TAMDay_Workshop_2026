@@ -1,0 +1,749 @@
+---
+- name: Investigate CVE Radar events with the governed AI adapter
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - vars/ai_risk_analysis_defaults.yml
+
+  vars:
+    # Runtime mode is fixed; non-sensitive defaults live in the Git-managed vars file.
+    ai_backend_mode_effective: governed_adapter
+
+    # Precedence for non-sensitive settings: Job Template Extra Variables > Git defaults.
+    ai_model_url_effective: >-
+      {{ ai_model_url | default(cve_radar_ai_defaults.ai_model_url, true) }}
+    _ai_api_token_env: "{{ lookup('ansible.builtin.env', 'AI_RISK_WEBHOOK_TOKEN') | default('', true) }}"
+    ai_api_token_effective: "{{ _ai_api_token_env }}"
+    ai_model_effective: "{{ ai_model | default(cve_radar_ai_defaults.ai_model, true) }}"
+    ai_validate_certs_effective: >-
+      {{ ai_validate_certs | default(cve_radar_ai_defaults.ai_validate_certs) | bool }}
+    ai_timeout_effective: >-
+      {{ ai_timeout | default(cve_radar_ai_defaults.ai_timeout) | int }}
+
+    rhel_mcp_url_effective: >-
+      {{ rhel_mcp_url | default(cve_radar_ai_defaults.rhel_mcp_url, true) }}
+    _rhel_mcp_token_env: "{{ lookup('ansible.builtin.env', 'RHEL_MCP_TOKEN') | default('', true) }}"
+    rhel_mcp_token_effective: "{{ rhel_mcp_token | default(_rhel_mcp_token_env, true) | default('', true) }}"
+    rhel_mcp_validate_certs_effective: >-
+      {{ rhel_mcp_validate_certs | default(cve_radar_ai_defaults.rhel_mcp_validate_certs) | bool }}
+    rhel_mcp_timeout_effective: >-
+      {{ rhel_mcp_timeout | default(cve_radar_ai_defaults.rhel_mcp_timeout) | int }}
+    rhel_mcp_sse_read_timeout_effective: >-
+      {{ rhel_mcp_sse_read_timeout | default(cve_radar_ai_defaults.rhel_mcp_sse_read_timeout) | int }}
+
+    governed_evidence_loop_enabled_effective: >-
+      {{ governed_evidence_loop_enabled | default(cve_radar_ai_defaults.governed_evidence_loop_enabled) | bool }}
+    governed_max_investigation_rounds_effective: >-
+      {{ governed_max_investigation_rounds | default(cve_radar_ai_defaults.governed_max_investigation_rounds) | int }}
+    governed_max_tool_calls_per_round_effective: >-
+      {{ governed_max_tool_calls_per_round | default(cve_radar_ai_defaults.governed_max_tool_calls_per_round) | int }}
+    governed_max_total_tool_calls_effective: >-
+      {{ governed_max_total_tool_calls | default(cve_radar_ai_defaults.governed_max_total_tool_calls) | int }}
+    governed_min_confidence_for_action_effective: >-
+      {{ governed_min_confidence_for_action | default(cve_radar_ai_defaults.governed_min_confidence_for_action) | float }}
+    governed_trust_structured_admin_trigger_effective: >-
+      {{ governed_trust_structured_admin_trigger | default(cve_radar_ai_defaults.governed_trust_structured_admin_trigger) | bool }}
+    governed_admin_trigger_confidence_floor_effective: >-
+      {{ governed_admin_trigger_confidence_floor | default(cve_radar_ai_defaults.governed_admin_trigger_confidence_floor) | float }}
+    governed_allowed_mcp_tools_effective: >-
+      {{ governed_allowed_mcp_tools | default(cve_radar_ai_defaults.governed_allowed_mcp_tools) }}
+    governed_auth_log_tail_lines_effective: >-
+      {{ governed_auth_log_tail_lines | default(cve_radar_ai_defaults.governed_auth_log_tail_lines) | int }}
+    governed_access_log_tail_lines_effective: >-
+      {{ governed_access_log_tail_lines | default(cve_radar_ai_defaults.governed_access_log_tail_lines) | int }}
+    governed_error_log_tail_lines_effective: >-
+      {{ governed_error_log_tail_lines | default(cve_radar_ai_defaults.governed_error_log_tail_lines) | int }}
+    governed_max_log_lines_effective: >-
+      {{ governed_max_log_lines | default(cve_radar_ai_defaults.governed_max_log_lines) | int }}
+    governed_model_can_override_lines_effective: >-
+      {{ governed_model_can_override_lines | default(cve_radar_ai_defaults.governed_model_can_override_lines) | bool }}
+    governed_tool_result_max_chars_effective: >-
+      {{ governed_tool_result_max_chars | default(cve_radar_ai_defaults.governed_tool_result_max_chars) | int }}
+    governed_max_evidence_chars_effective: >-
+      {{ governed_max_evidence_chars | default(cve_radar_ai_defaults.governed_max_evidence_chars) | int }}
+    ai_model_max_retries_effective: >-
+      {{ ai_model_max_retries | default(cve_radar_ai_defaults.ai_model_max_retries) | int }}
+    ai_model_retry_delay_seconds_effective: >-
+      {{ ai_model_retry_delay_seconds | default(cve_radar_ai_defaults.ai_model_retry_delay_seconds) | float }}
+
+    ai_debug_trace_effective: >-
+      {{ ai_debug_trace | default(cve_radar_ai_defaults.ai_debug_trace) | bool }}
+    ai_debug_trace_max_chars_effective: >-
+      {{ ai_debug_trace_max_chars | default(cve_radar_ai_defaults.ai_debug_trace_max_chars) | int }}
+    ai_debug_trace_include_mcp_results_effective: >-
+      {{ ai_debug_trace_include_mcp_results | default(cve_radar_ai_defaults.ai_debug_trace_include_mcp_results) | bool }}
+
+    ai_decision_event_enabled_effective: >-
+      {{ ai_decision_event_enabled | default(cve_radar_ai_defaults.ai_decision_event_enabled) | bool }}
+    ai_decision_event_dry_run_effective: >-
+      {{ ai_decision_event_dry_run | default(cve_radar_ai_defaults.ai_decision_event_dry_run) | bool }}
+    ai_decision_min_confidence_effective: >-
+      {{ ai_decision_min_confidence | default(cve_radar_ai_defaults.ai_decision_min_confidence) | float }}
+    _eda_stream_url_env: "{{ lookup('ansible.builtin.env', 'EDA_EVENT_STREAM_URL') | default('', true) }}"
+    eda_decision_stream_url_effective: >-
+      {{ eda_event_stream_url | default(_eda_stream_url_env, true) }}
+    _eda_stream_token_env: "{{ lookup('ansible.builtin.env', 'EDA_EVENT_STREAM_TOKEN') | default('', true) }}"
+    eda_decision_stream_token_effective: >-
+      {{ eda_event_stream_token | default(_eda_stream_token_env, true) }}
+    eda_decision_stream_header_effective: >-
+      {{ ai_decision_event_auth_header | default(cve_radar_ai_defaults.ai_decision_event_auth_header, true) }}
+    eda_decision_stream_verify_tls_effective: >-
+      {{ eda_event_stream_verify_tls | default(cve_radar_ai_defaults.eda_event_stream_verify_tls) | bool }}
+    eda_decision_stream_timeout_effective: >-
+      {{ ai_decision_event_timeout | default(cve_radar_ai_defaults.ai_decision_event_timeout) | int }}
+
+    remediation_repair_branch_effective: >-
+      {{ remediation_repair_branch | default(cve_radar_ai_defaults.remediation_repair_branch, true) }}
+    remediation_repair_commit_effective: >-
+      {{ remediation_repair_commit | default(cve_radar_ai_defaults.remediation_repair_commit, true) }}
+    remediation_web_source_variant_effective: >-
+      {{ remediation_web_source_variant | default(cve_radar_ai_defaults.remediation_web_source_variant, true) }}
+
+    rhel_mcp_log_path: /var/log/kernel-cve-radar/auth-events.jsonl
+    rhel_mcp_web_access_log_path: /var/log/httpd/access_log
+    rhel_mcp_web_error_log_path: /var/log/httpd/error_log
+    allowed_trigger_event_keys:
+      - kernel-cve-radar.authorization.admin.access
+      - kernel-cve-radar.authorization.admin_content.exposure
+      - kernel-cve-radar.authentication.admin.login.success
+    allowed_ai_assessments: [insufficient_context, likely_user_error, suspicious, highly_suspicious]
+    allowed_incident_types: [unknown, user_error, broken_access_control, admin_content_exposure, suspicious_login_success, possible_account_compromise]
+    allowed_next_steps: [observe, collect_more_evidence, alert, require_approval, repair_web_code]
+    fatal_investigation_statuses:
+      - model_auth_error
+      - model_configuration_error
+      - model_http_error
+      - model_transport_error
+      - model_response_error
+      - mcp_error
+      - adapter_error
+      - adapter_input_error
+
+  tasks:
+    - name: Load raw trigger event
+      ansible.builtin.set_fact:
+        raw_trigger_event: "{{ trigger_event | default({}) }}"
+    - name: Load EDA detection context
+      ansible.builtin.set_fact:
+        eda_detection_context: "{{ detection_context | default({}) }}"
+        eda_related_events: "{{ related_events | default({}) }}"
+    - name: Validate governed adapter configuration
+      ansible.builtin.assert:
+        that:
+          - ai_backend_mode | default('governed_adapter') == 'governed_adapter'
+          - ai_model_url_effective | length > 0
+          - rhel_mcp_url_effective | length > 0
+          - ai_api_token_effective | length > 0
+          - ai_timeout_effective | int >= 30
+          - rhel_mcp_timeout_effective | int >= 5
+        fail_msg: >-
+          This project supports ai_backend_mode=governed_adapter only. Attach the
+          Model credential that injects AI_RISK_WEBHOOK_URL,
+          AI_RISK_WEBHOOK_TOKEN, and AI_VALIDATE_CERTS, and configure rhel_mcp_url.
+
+    - name: Show safe governed adapter settings
+      ansible.builtin.debug:
+        msg:
+          ai_backend_mode: governed_adapter
+          ai_model_url: "{{ ai_model_url_effective }}"
+          ai_model: "{{ ai_model_effective }}"
+          ai_api_token_present: "{{ ai_api_token_effective | length > 0 }}"
+          rhel_mcp_url: "{{ rhel_mcp_url_effective }}"
+          ai_validate_certs: "{{ ai_validate_certs_effective }}"
+          rhel_mcp_validate_certs: "{{ rhel_mcp_validate_certs_effective }}"
+          evidence_rounds: "{{ governed_max_investigation_rounds_effective }}"
+          tool_calls_per_round: "{{ governed_max_tool_calls_per_round_effective }}"
+          total_tool_calls: "{{ governed_max_total_tool_calls_effective }}"
+          auth_log_tail_lines: "{{ governed_auth_log_tail_lines_effective }}"
+          access_log_tail_lines: "{{ governed_access_log_tail_lines_effective }}"
+          error_log_tail_lines: "{{ governed_error_log_tail_lines_effective }}"
+          max_evidence_chars: "{{ governed_max_evidence_chars_effective }}"
+          model_max_retries: "{{ ai_model_max_retries_effective }}"
+          decision_event_enabled: "{{ ai_decision_event_enabled_effective }}"
+          decision_event_dry_run: "{{ ai_decision_event_dry_run_effective }}"
+    - name: Validate security scenario trigger
+      ansible.builtin.assert:
+        that:
+          - raw_trigger_event is mapping
+          - raw_trigger_event.event_key | default('') in allowed_trigger_event_keys
+          - raw_trigger_event.collector is mapping
+          - raw_trigger_event.collector.hostname | default('') | length > 0
+          - (investigation_lookback_minutes | default(5) | int) >= 1
+          - (investigation_lookback_minutes | default(5) | int) <= 60
+        fail_msg: >-
+          The Job must receive extra_vars.trigger_event containing one supported
+          CVE Radar security scenario event with collector.hostname. Supported
+          events are admin content exposure and successful admin login triggers.
+    - name: Build sanitized trigger observation
+      ansible.builtin.set_fact:
+        trigger_observation:
+          schema_version: "{{ raw_trigger_event.schema_version | default('1.1') }}"
+          timestamp: "{{ raw_trigger_event.observed_at | default(raw_trigger_event['@timestamp'] | default(''), true) }}"
+          event_id: "{{ raw_trigger_event.event_id | default('') }}"
+          event_key: "{{ raw_trigger_event.event_key }}"
+          application: "{{ raw_trigger_event.application | default('kernel-cve-radar') }}"
+          event_type: "{{ raw_trigger_event.event_type | default('unknown') }}"
+          event_action: "{{ raw_trigger_event.event_action | default('unknown') }}"
+          event_outcome: "{{ raw_trigger_event.event_outcome | default('unknown') }}"
+          failure_reason: "{{ raw_trigger_event.failure_reason | default('unknown') }}"
+          username: "{{ raw_trigger_event.username | default('') }}"
+          user_role: "{{ raw_trigger_event.user_role | default('') }}"
+          source_ip: "{{ raw_trigger_event.source_ip | default('') }}"
+          effective_source_ip: "{{ raw_trigger_event.effective_source_ip | default('') }}"
+          connection_ip: "{{ raw_trigger_event.connection_ip | default('') }}"
+          forwarded_for: "{{ raw_trigger_event.forwarded_for | default(None) }}"
+          http_method: "{{ raw_trigger_event.http_method | default('') }}"
+          http_path: "{{ raw_trigger_event.url_path | default(raw_trigger_event.http_path | default(''), true) }}"
+          http_status: "{{ raw_trigger_event.status_code | default(raw_trigger_event.http_status | default(''), true) }}"
+          user_agent: "{{ raw_trigger_event.user_agent | default('') }}"
+          policy: "{{ raw_trigger_event.policy | default('') }}"
+          success_at: >-
+            {{ raw_trigger_event.success_at | default(raw_trigger_event.observed_at | default(''), true) }}
+          collector:
+            name: "{{ raw_trigger_event.collector.name | default('') }}"
+            version: "{{ raw_trigger_event.collector.version | default('') }}"
+            hostname: "{{ raw_trigger_event.collector.hostname }}"
+            received_at: "{{ raw_trigger_event.collector.received_at | default('') }}"
+            sequence: "{{ raw_trigger_event.collector.sequence | default(None) }}"
+    - name: Build investigation request
+      ansible.builtin.set_fact:
+        ai_investigation_request:
+          request_id: >-
+            {{
+              trigger_observation.event_id
+              | default(trigger_observation.collector.hostname ~ '-' ~ trigger_observation.timestamp, true)
+            }}
+          trigger_event: "{{ trigger_observation }}"
+          detection_context: "{{ eda_detection_context }}"
+          related_events: "{{ eda_related_events }}"
+          investigation:
+            target_host: "{{ trigger_observation.collector.hostname }}"
+            lookback_minutes: "{{ investigation_lookback_minutes | default(5) | int }}"
+            auth_log_path: "{{ rhel_mcp_log_path }}"
+            web_access_log_path: "{{ rhel_mcp_web_access_log_path }}"
+            web_error_log_path: "{{ rhel_mcp_web_error_log_path }}"
+            read_only: true
+            log_read_policy:
+              auth_log_tail_lines: "{{ governed_auth_log_tail_lines_effective }}"
+              web_access_log_tail_lines: "{{ governed_access_log_tail_lines_effective }}"
+              web_error_log_tail_lines: "{{ governed_error_log_tail_lines_effective }}"
+              max_lines: "{{ governed_max_log_lines_effective }}"
+              model_can_override_lines: "{{ governed_model_can_override_lines_effective }}"
+            evidence_loop_policy:
+              enabled: "{{ governed_evidence_loop_enabled_effective }}"
+              max_investigation_rounds: "{{ governed_max_investigation_rounds_effective }}"
+              max_tool_calls_per_round: "{{ governed_max_tool_calls_per_round_effective }}"
+              max_total_tool_calls: "{{ governed_max_total_tool_calls_effective }}"
+              min_confidence_for_action: "{{ governed_min_confidence_for_action_effective }}"
+            trust_structured_admin_trigger: "{{ governed_trust_structured_admin_trigger_effective }}"
+            admin_trigger_confidence_floor: "{{ governed_admin_trigger_confidence_floor_effective }}"
+            objectives:
+              - "Use the EDA trigger only as a wake-up signal, not as a final security verdict."
+              - "Scenario broken_access_control: inspect recent web access and source code context to verify whether a non-admin user can access admin content; recommend repair_web_code only when evidence supports it."
+              - "Scenario admin_login_success: let the Model plan a bounded read-only investigation using only read_log_file, get_journal_logs, and get_service_status. The authentication log remains mandatory evidence for counting admin login failures in the five minutes immediately before the successful login. Require approval only when the count is at least three; otherwise observe without starting a review Workflow."
+              - "The AAP Custom EE runs the governed adapter and uses the configured RHEL MCP URL to inspect the target host."
+              - "Only the local governed adapter is supported by this slim project."
+            constraints:
+              - "AAP does not start an AI Agent on the target host."
+              - "The governed adapter runs only inside the AAP Custom EE."
+              - "RHEL MCP and SSH key handling remain outside the target web host process."
+              - "RHEL MCP owns the remote SSH connection and remains read-only for investigation."
+              - "Do not execute write operations through RHEL MCP."
+              - "For admin_login_success, do not recommend account locking, source blocking, maintenance mode, or any automatic system change."
+              - "When evidence is insufficient, return insufficient_context."
+    - name: Show investigation input when AI trace is enabled
+      ansible.builtin.debug:
+        msg:
+          trace_stage: investigation_request
+          data: "{{ ai_investigation_request }}"
+      when: ai_debug_trace_effective | bool
+    - name: Create governed AI trace file
+      ansible.builtin.tempfile:
+        state: file
+        prefix: cve-radar-ai-trace-
+        suffix: .jsonl
+      register: governed_trace_file
+      when:
+        - ai_debug_trace_effective | bool
+    - name: Run governed adapter inside the AAP Custom EE
+      ansible.builtin.command:
+        argv:
+          - python3
+          - "{{ playbook_dir }}/files/governed_agentic_adapter.py"
+        stdin: "{{ ai_investigation_request | to_json }}"
+      environment:
+        AI_MODEL_URL: "{{ ai_model_url_effective }}"
+        AI_API_TOKEN: "{{ ai_api_token_effective }}"
+        AI_MODEL: "{{ ai_model_effective }}"
+        AI_VALIDATE_CERTS: "{{ ai_validate_certs_effective | string | lower }}"
+        AI_TIMEOUT: "{{ ai_timeout_effective }}"
+        AI_MODEL_MAX_RETRIES: "{{ ai_model_max_retries_effective }}"
+        AI_MODEL_RETRY_DELAY_SECONDS: "{{ ai_model_retry_delay_seconds_effective }}"
+        RHEL_MCP_URL: "{{ rhel_mcp_url_effective }}"
+        RHEL_MCP_TOKEN: "{{ rhel_mcp_token_effective }}"
+        RHEL_MCP_VALIDATE_CERTS: "{{ rhel_mcp_validate_certs_effective | string | lower }}"
+        RHEL_MCP_TIMEOUT: "{{ rhel_mcp_timeout_effective }}"
+        RHEL_MCP_SSE_READ_TIMEOUT: "{{ rhel_mcp_sse_read_timeout_effective }}"
+        GOVERNED_EVIDENCE_LOOP_ENABLED: "{{ governed_evidence_loop_enabled_effective | string | lower }}"
+        GOVERNED_MAX_INVESTIGATION_ROUNDS: "{{ governed_max_investigation_rounds_effective }}"
+        GOVERNED_MAX_TOOL_CALLS_PER_ROUND: "{{ governed_max_tool_calls_per_round_effective }}"
+        GOVERNED_MAX_TOTAL_TOOL_CALLS: "{{ governed_max_total_tool_calls_effective }}"
+        GOVERNED_MIN_CONFIDENCE_FOR_ACTION: "{{ governed_min_confidence_for_action_effective }}"
+        GOVERNED_TRUST_STRUCTURED_ADMIN_TRIGGER: >-
+          {{ governed_trust_structured_admin_trigger_effective | string | lower }}
+        GOVERNED_ADMIN_TRIGGER_CONFIDENCE_FLOOR: >-
+          {{ governed_admin_trigger_confidence_floor_effective }}
+        GOVERNED_ALLOWED_MCP_TOOLS: "{{ governed_allowed_mcp_tools_effective }}"
+        GOVERNED_AUTH_LOG_TAIL_LINES: "{{ governed_auth_log_tail_lines_effective }}"
+        GOVERNED_ACCESS_LOG_TAIL_LINES: "{{ governed_access_log_tail_lines_effective }}"
+        GOVERNED_ERROR_LOG_TAIL_LINES: "{{ governed_error_log_tail_lines_effective }}"
+        GOVERNED_MAX_LOG_LINES: "{{ governed_max_log_lines_effective }}"
+        GOVERNED_TOOL_RESULT_MAX_CHARS: "{{ governed_tool_result_max_chars_effective }}"
+        GOVERNED_MAX_EVIDENCE_CHARS: "{{ governed_max_evidence_chars_effective }}"
+        GOVERNED_MODEL_CAN_OVERRIDE_LINES: >-
+          {{ governed_model_can_override_lines_effective | string | lower }}
+        GOVERNED_DEBUG_TRACE: "{{ ai_debug_trace_effective | string | lower }}"
+        GOVERNED_TRACE_FILE: >-
+          {{ governed_trace_file.path if (governed_trace_file is defined) else '' }}
+        GOVERNED_TRACE_MAX_CHARS: "{{ ai_debug_trace_max_chars_effective }}"
+        GOVERNED_TRACE_INCLUDE_MCP_RESULTS: >-
+          {{ ai_debug_trace_include_mcp_results_effective | string | lower }}
+      register: governed_adapter_result
+      changed_when: false
+      no_log: true
+    - name: Read governed AI and MCP trace file
+      ansible.builtin.slurp:
+        src: "{{ governed_trace_file.path }}"
+      register: governed_trace_file_content
+      no_log: true
+      when:
+        - ai_debug_trace_effective | bool
+        - governed_trace_file is defined
+    - name: Decode governed AI and MCP trace lines
+      ansible.builtin.set_fact:
+        governed_trace_lines: >-
+          {{
+            (governed_trace_file_content.content | b64decode).splitlines()
+            | reject('equalto', '')
+            | list
+          }}
+        governed_trace_records: []
+      no_log: true
+      when:
+        - ai_debug_trace_effective | bool
+        - governed_trace_file_content is defined
+    - name: Parse governed AI and MCP trace records
+      ansible.builtin.set_fact:
+        governed_trace_records: >-
+          {{ governed_trace_records + [(item | from_json)] }}
+      loop: "{{ governed_trace_lines | default([]) }}"
+      no_log: true
+      when:
+        - ai_debug_trace_effective | bool
+    - name: Show governed Model and MCP trace details
+      ansible.builtin.debug:
+        msg:
+          trace_stage: "{{ item.stage | default('unknown') }}"
+          timestamp: "{{ item.timestamp | default('') }}"
+          data: "{{ item.data | default({}) }}"
+      loop: "{{ governed_trace_records | default([]) }}"
+      loop_control:
+        label: "{{ item.stage | default('unknown') }}"
+      when:
+        - ai_debug_trace_effective | bool
+    - name: Remove governed AI trace file
+      ansible.builtin.file:
+        path: "{{ governed_trace_file.path }}"
+        state: absent
+      when:
+        - ai_debug_trace_effective | bool
+        - governed_trace_file is defined
+    - name: Store governed adapter response
+      ansible.builtin.set_fact:
+        ai_final_result: "{{ governed_adapter_result.stdout | from_json }}"
+      no_log: true
+    - name: Validate AI response envelope
+      ansible.builtin.assert:
+        that:
+          - ai_final_result is mapping
+          - ai_final_result.assessment | default('') in allowed_ai_assessments
+          - ai_final_result.incident_type | default('unknown') in allowed_incident_types
+          - ai_final_result.recommended_next_step | default('') in allowed_next_steps
+          - (ai_final_result.confidence | default(-1) | float) >= 0
+          - (ai_final_result.confidence | default(-1) | float) <= 1
+          - ai_final_result.reason | default('') | length > 0
+          - ai_final_result.evidence | default({}) is mapping
+          - ai_final_result.mcp_tools_used | default([]) is sequence
+        fail_msg: >-
+          The AI response does not match the expected investigation contract.
+          Verify AI_MODEL_URL, RHEL_MCP_URL, the model response contract, and the Custom EE Python dependencies.
+    - name: Show fatal AI or MCP investigation error
+      ansible.builtin.debug:
+        msg:
+          investigation_status: "{{ ai_final_result.investigation_status | default('adapter_error') }}"
+          ai_api_token_present: "{{ ai_api_token_effective | length > 0 }}"
+          model_http_status: "{{ ai_final_result.model_http_status | default('') }}"
+          model_error_stage: "{{ ai_final_result.model_error_stage | default('') }}"
+          model_error_category: "{{ ai_final_result.model_error_category | default('') }}"
+          mcp_error_stage: "{{ ai_final_result.mcp_error_stage | default('') }}"
+          mcp_root_errors: "{{ ai_final_result.mcp_root_errors | default([]) }}"
+          reason: "{{ ai_final_result.reason | default('Technical investigation failure') }}"
+      when:
+        - ai_final_result.investigation_status | default('adapter_error') in fatal_investigation_statuses
+
+    - name: Stop AI Risk Analysis on Model or MCP failure
+      ansible.builtin.fail:
+        msg: >-
+          CVE Radar AI Risk Analysis stopped because a required dependency failed.
+          investigation_status={{ ai_final_result.investigation_status | default('adapter_error') }},
+          model_http_status={{ ai_final_result.model_http_status | default('') }},
+          model_stage={{ ai_final_result.model_error_stage | default('') }},
+          mcp_stage={{ ai_final_result.mcp_error_stage | default('') }}.
+          No action proposal was created or sent.
+      when:
+        - ai_final_result.investigation_status | default('adapter_error') in fatal_investigation_statuses
+
+    - name: Publish investigation result for the workflow
+      ansible.builtin.set_stats:
+        data:
+          cve_radar_investigation_id: "{{ ai_investigation_request.request_id }}"
+          cve_radar_trigger_event_id: "{{ trigger_observation.event_id }}"
+          cve_radar_trigger_event_key: "{{ trigger_observation.event_key }}"
+          cve_radar_detection_context: "{{ eda_detection_context }}"
+          cve_radar_trigger_timestamp: "{{ trigger_observation.timestamp }}"
+          cve_radar_target_host: "{{ trigger_observation.collector.hostname }}"
+          cve_radar_username: "{{ trigger_observation.username }}"
+          cve_radar_http_path: "{{ trigger_observation.http_path }}"
+          cve_radar_effective_source_ip: "{{ trigger_observation.effective_source_ip }}"
+          cve_radar_ai_backend_mode: "{{ ai_backend_mode_effective }}"
+          cve_radar_ai_assessment: "{{ ai_final_result.assessment }}"
+          cve_radar_ai_incident_type: "{{ ai_final_result.incident_type | default('unknown') }}"
+          cve_radar_ai_confidence: "{{ ai_final_result.confidence | float }}"
+          cve_radar_ai_severity: "{{ ai_final_result.severity | default('medium') }}"
+          cve_radar_ai_recommended_next_step: "{{ ai_final_result.recommended_next_step }}"
+          cve_radar_ai_reason: "{{ ai_final_result.reason }}"
+          cve_radar_ai_affected_user: "{{ ai_final_result.affected_user | default('') }}"
+          cve_radar_ai_source_ips: "{{ ai_final_result.source_ips | default([]) }}"
+          cve_radar_ai_evidence_summary: "{{ ai_final_result.evidence_summary | default([]) }}"
+          cve_radar_ai_evidence: "{{ ai_final_result.evidence | default({}) }}"
+          cve_radar_ai_governance_policy_applied: >-
+            {{ ai_final_result.governance_policy_applied | default([]) }}
+          cve_radar_ai_mcp_tools_used: "{{ ai_final_result.mcp_tools_used | default([]) }}"
+        per_host: false
+    - name: Show safe investigation summary
+      ansible.builtin.debug:
+        msg:
+          investigation_id: "{{ ai_investigation_request.request_id }}"
+          ai_backend_mode: "{{ ai_backend_mode_effective }}"
+          ai_model_url: "{{ ai_model_url_effective }}"
+          rhel_mcp_url: "{{ rhel_mcp_url_effective }}"
+          target_host: "{{ trigger_observation.collector.hostname }}"
+          trigger_event_key: "{{ trigger_observation.event_key }}"
+          detection_scenario: "{{ eda_detection_context.scenario | default('unknown') }}"
+          trigger_username: "{{ trigger_observation.username }}"
+          trigger_source_ip: "{{ trigger_observation.effective_source_ip }}"
+          trigger_http_path: "{{ trigger_observation.http_path }}"
+          assessment: "{{ ai_final_result.assessment }}"
+          incident_type: "{{ ai_final_result.incident_type | default('unknown') }}"
+          confidence: "{{ ai_final_result.confidence }}"
+          severity: "{{ ai_final_result.severity | default('medium') }}"
+          recommended_next_step: "{{ ai_final_result.recommended_next_step }}"
+          affected_user: "{{ ai_final_result.affected_user | default('') }}"
+          source_ips: "{{ ai_final_result.source_ips | default([]) }}"
+          evidence_summary: "{{ ai_final_result.evidence_summary | default([]) }}"
+          governance_policy_applied: >-
+            {{ ai_final_result.governance_policy_applied | default([]) }}
+          mcp_tools_used: "{{ ai_final_result.mcp_tools_used | default([]) }}"
+          reason: "{{ ai_final_result.reason }}"
+    - name: Evaluate AI decision event policy
+      ansible.builtin.set_fact:
+        ai_decision_event_policy:
+          enabled: "{{ ai_decision_event_enabled_effective | bool }}"
+          dry_run: "{{ ai_decision_event_dry_run_effective | bool }}"
+          assessment_allowed: >-
+            {{ ai_final_result.assessment | default('insufficient_context') in ['suspicious', 'highly_suspicious'] }}
+          action_allowed: >-
+            {{ ai_final_result.recommended_next_step | default('collect_more_evidence') in ['repair_web_code', 'require_approval'] }}
+          incident_action_match: >-
+            {{
+              (ai_final_result.recommended_next_step | default('') == 'repair_web_code'
+               and ai_final_result.incident_type | default('unknown') in ['broken_access_control', 'admin_content_exposure'])
+              or
+              (ai_final_result.recommended_next_step | default('') == 'require_approval'
+               and ai_final_result.incident_type | default('unknown') in ['suspicious_login_success', 'possible_account_compromise'])
+            }}
+          confidence_sufficient: >-
+            {{ (ai_final_result.confidence | default(0) | float) >= (ai_decision_min_confidence_effective | float) }}
+          target_host_present: >-
+            {{ trigger_observation.collector.hostname | default('') | length > 0 }}
+          model_available: >-
+            {{
+              ai_final_result.investigation_status | default('')
+              not in ['model_auth_error', 'model_http_error', 'model_transport_error', 'model_response_error']
+            }}
+          minimum_confidence: "{{ ai_decision_min_confidence_effective | float }}"
+        ai_decision_event_eligible: >-
+          {{
+            ai_final_result.investigation_status | default('')
+              not in ['model_auth_error', 'model_http_error', 'model_transport_error', 'model_response_error']
+            and ai_final_result.assessment | default('insufficient_context') in ['suspicious', 'highly_suspicious']
+            and ai_final_result.recommended_next_step | default('collect_more_evidence') in ['repair_web_code', 'require_approval']
+            and (
+              (ai_final_result.recommended_next_step | default('') == 'repair_web_code'
+               and ai_final_result.incident_type | default('unknown') in ['broken_access_control', 'admin_content_exposure'])
+              or
+              (ai_final_result.recommended_next_step | default('') == 'require_approval'
+               and ai_final_result.incident_type | default('unknown') in ['suspicious_login_success', 'possible_account_compromise'])
+            )
+            and (ai_final_result.confidence | default(0) | float) >= (ai_decision_min_confidence_effective | float)
+            and trigger_observation.collector.hostname | default('') | length > 0
+          }}
+    - name: Build governed AI action proposal event
+      ansible.builtin.set_fact:
+        ai_action_proposal_event:
+          schema_version: kernel-cve-radar.ai-decision.v1
+          timestamp: "{{ now(utc=true, fmt='%Y-%m-%dT%H:%M:%SZ') }}"
+          event_id: "ai-decision-{{ ai_investigation_request.request_id }}"
+          event_key: >-
+            {{
+              'kernel-cve-radar.ai.remediation.proposed'
+              if ai_final_result.recommended_next_step == 'repair_web_code'
+              else 'kernel-cve-radar.ai.review.proposed'
+            }}
+          event_source: ai_analysis
+          routing:
+            approved: true
+            workflow_key: >-
+              {{
+                'governed_web_remediation'
+                if ai_final_result.recommended_next_step == 'repair_web_code'
+                else 'suspicious_login_review'
+              }}
+            policy_version: governed-action-v2
+          investigation_id: "{{ ai_investigation_request.request_id }}"
+          parent_event_id: "{{ trigger_observation.event_id }}"
+          target_host: "{{ trigger_observation.collector.hostname }}"
+          assessment: "{{ ai_final_result.assessment }}"
+          incident_type: "{{ ai_final_result.incident_type | default('unknown') }}"
+          confidence: "{{ ai_final_result.confidence | default(0) | float }}"
+          severity: "{{ ai_final_result.severity | default('medium') }}"
+          recommended_next_step: "{{ ai_final_result.recommended_next_step }}"
+          affected_user: "{{ ai_final_result.affected_user | default('') }}"
+          source_ips: "{{ ai_final_result.source_ips | default([]) }}"
+          reason: "{{ ai_final_result.reason | default('') }}"
+          evidence_summary: "{{ ai_final_result.evidence_summary | default([]) }}"
+          workflow_review_summary: >-
+            {{
+              '[' ~ ai_investigation_request.request_id ~ '] '
+              ~ (ai_final_result.evidence_summary | default([]) | join('；'))
+            }}
+          governance_policy_applied: >-
+            {{ ai_final_result.governance_policy_applied | default([]) }}
+          mcp_tools_used: "{{ ai_final_result.mcp_tools_used | default([]) }}"
+          trigger_context:
+            username: "{{ trigger_observation.username | default('') }}"
+            effective_source_ip: "{{ trigger_observation.effective_source_ip | default('') }}"
+            failure_count: >-
+              {{ ai_final_result.evidence.recent_admin_login_check.failure_count | default(0) | int }}
+            failure_threshold: >-
+              {{ ai_final_result.evidence.recent_admin_login_check.failure_threshold | default(3) | int }}
+            failure_window_seconds: >-
+              {{ (ai_final_result.evidence.recent_admin_login_check.lookback_minutes | default(5) | int) * 60 }}
+            window_start: >-
+              {{ ai_final_result.evidence.recent_admin_login_check.window_start | default('') }}
+            success_at: "{{ trigger_observation.success_at | default(trigger_observation.timestamp | default(''), true) }}"
+            failures: >-
+              {{ ai_final_result.evidence.recent_admin_login_check.failures | default([]) }}
+          handoff:
+            workflow: >-
+              {{
+                'governed_web_remediation'
+                if ai_final_result.recommended_next_step == 'repair_web_code'
+                else 'suspicious_login_review'
+              }}
+            action: "{{ ai_final_result.recommended_next_step }}"
+            web_source_variant: "{{ remediation_web_source_variant_effective }}"
+            repair_branch: "{{ remediation_repair_branch_effective }}"
+            repair_commit: "{{ remediation_repair_commit_effective }}"
+          review:
+            post_login_harmful_activity_observed: >-
+              {{
+                ai_final_result.evidence.post_login_harmful_activity_observed
+                | default(false)
+                | bool
+              }}
+            automatic_account_action: false
+      when: ai_decision_event_eligible | bool
+    - name: Validate AI decision Event Stream configuration
+      ansible.builtin.assert:
+        that:
+          - eda_decision_stream_url_effective | length > 0
+          - eda_decision_stream_token_effective | length > 0
+          - eda_decision_stream_header_effective | length > 0
+          - eda_decision_stream_timeout_effective | int >= 5
+        fail_msg: >-
+          AI produced an eligible action proposal, but the same EDA Event
+          Stream URL/token are unavailable. Attach the existing Event Stream
+          sender credential or provide eda_event_stream_url and
+          eda_event_stream_token to the AI Risk Analysis Job Template.
+      when:
+        - ai_decision_event_enabled_effective | bool
+        - ai_decision_event_eligible | bool
+        - not ai_decision_event_dry_run_effective | bool
+    - name: Send governed AI action proposal to the same EDA Event Stream
+      ansible.builtin.uri:
+        url: "{{ eda_decision_stream_url_effective }}"
+        method: POST
+        headers: >-
+          {{
+            {'Content-Type': 'application/json', 'Accept': 'application/json'}
+            | combine({eda_decision_stream_header_effective: eda_decision_stream_token_effective})
+          }}
+        body_format: json
+        body: "{{ ai_action_proposal_event }}"
+        return_content: true
+        status_code:
+          - 200
+          - 201
+          - 202
+          - 204
+        timeout: "{{ eda_decision_stream_timeout_effective }}"
+        validate_certs: "{{ eda_decision_stream_verify_tls_effective }}"
+      register: ai_decision_event_send_result
+      failed_when: false
+      changed_when: >-
+        {{
+          (ai_decision_event_send_result.status
+          | default(0)
+          | int) in [200, 201, 202, 204]
+        }}
+      no_log: true
+      when:
+        - ai_decision_event_enabled_effective | bool
+        - ai_decision_event_eligible | bool
+        - not ai_decision_event_dry_run_effective | bool
+    - name: Build safe AI decision Event Stream diagnostics
+      ansible.builtin.set_fact:
+        ai_decision_event_send_succeeded: >-
+          {{
+            ai_decision_event_send_result.status
+            | default(0)
+            | int in [200, 201, 202, 204]
+          }}
+        ai_decision_event_safe_status: >-
+          {{ ai_decision_event_send_result.status | default(-1) | int }}
+        ai_decision_event_safe_message: >-
+          {{
+            (
+              ai_decision_event_send_result.msg
+              | default('No HTTP response message was returned.')
+              | string
+              | replace(eda_decision_stream_token_effective, '<redacted>')
+            )[:1000]
+          }}
+        ai_decision_event_safe_response: >-
+          {{
+            (
+              ai_decision_event_send_result.content
+              | default('')
+              | string
+              | replace(eda_decision_stream_token_effective, '<redacted>')
+            )[:1000]
+          }}
+      no_log: true
+      when:
+        - ai_decision_event_enabled_effective | bool
+        - ai_decision_event_eligible | bool
+        - not ai_decision_event_dry_run_effective | bool
+        - ai_decision_event_send_result is defined
+    - name: Show safe AI decision Event Stream response
+      ansible.builtin.debug:
+        msg:
+          status: "{{ ai_decision_event_safe_status | default(-1) }}"
+          succeeded: "{{ ai_decision_event_send_succeeded | default(false) | bool }}"
+          message: "{{ ai_decision_event_safe_message | default('') }}"
+          response: "{{ ai_decision_event_safe_response | default('') }}"
+          auth_header: "{{ eda_decision_stream_header_effective }}"
+          validate_certs: "{{ eda_decision_stream_verify_tls_effective | bool }}"
+          timeout: "{{ eda_decision_stream_timeout_effective | int }}"
+      when:
+        - ai_decision_event_enabled_effective | bool
+        - ai_decision_event_eligible | bool
+        - not ai_decision_event_dry_run_effective | bool
+        - ai_decision_event_send_result is defined
+    - name: Validate AI decision Event Stream response
+      ansible.builtin.assert:
+        that:
+          - ai_decision_event_send_succeeded | default(false) | bool
+        fail_msg: >-
+          Failed to send the AI action proposal to the EDA Event Stream.
+          HTTP status={{ ai_decision_event_safe_status | default(-1) }},
+          message={{ ai_decision_event_safe_message | default('') }},
+          response={{ ai_decision_event_safe_response | default('') }}.
+          Verify the sender URL, token/header, TLS setting, and network access
+          from the Execution Environment.
+        success_msg: >-
+          AI action proposal accepted by the EDA Event Stream with HTTP
+          status {{ ai_decision_event_safe_status }}.
+      when:
+        - ai_decision_event_enabled_effective | bool
+        - ai_decision_event_eligible | bool
+        - not ai_decision_event_dry_run_effective | bool
+        - ai_decision_event_send_result is defined
+    - name: Publish AI decision event hand-off result
+      ansible.builtin.set_stats:
+        data:
+          cve_radar_ai_analysis_completed: true
+          cve_radar_ai_model_available: >-
+            {{ ai_decision_event_policy.model_available | default(false) | bool }}
+          cve_radar_ai_decision_event_enabled: "{{ ai_decision_event_enabled_effective | bool }}"
+          cve_radar_ai_decision_event_eligible: "{{ ai_decision_event_eligible | bool }}"
+          cve_radar_ai_decision_event_dry_run: "{{ ai_decision_event_dry_run_effective | bool }}"
+          cve_radar_ai_decision_event_sent: >-
+            {{
+              ai_decision_event_enabled_effective | bool
+              and ai_decision_event_eligible | bool
+              and not ai_decision_event_dry_run_effective | bool
+              and ai_decision_event_send_result is defined
+              and ai_decision_event_send_succeeded | default(false) | bool
+            }}
+          cve_radar_ai_decision_event: >-
+            {{ ai_action_proposal_event | default({}) }}
+        per_host: false
+    - name: Show AI decision event hand-off summary
+      ansible.builtin.debug:
+        msg:
+          analysis_completed: true
+          model_available: "{{ ai_decision_event_policy.model_available | default(false) | bool }}"
+          decision_event_enabled: "{{ ai_decision_event_enabled_effective | bool }}"
+          decision_event_eligible: "{{ ai_decision_event_eligible | bool }}"
+          decision_event_dry_run: "{{ ai_decision_event_dry_run_effective | bool }}"
+          policy: "{{ ai_decision_event_policy }}"
+          decision_event_sent: >-
+            {{
+              ai_decision_event_enabled_effective | bool
+              and ai_decision_event_eligible | bool
+              and not ai_decision_event_dry_run_effective | bool
+              and ai_decision_event_send_result is defined
+              and ai_decision_event_send_succeeded | default(false) | bool
+            }}
+          decision_event_accepted_by_stream: >-
+            {{
+              ai_decision_event_enabled_effective | bool
+              and ai_decision_event_eligible | bool
+              and not ai_decision_event_dry_run_effective | bool
+              and ai_decision_event_send_result is defined
+              and ai_decision_event_send_succeeded | default(false) | bool
+            }}
+          workflow_launch_confirmed: false
+          workflow_launch_confirmation_note: >-
+            Event Stream acceptance does not confirm Rulebook matching or Workflow launch.
+            Verify Automation Decisions Rule Audit and Actions.
+          target_host: "{{ trigger_observation.collector.hostname }}"
+          action: "{{ ai_final_result.recommended_next_step | default('collect_more_evidence') }}"
+          routed_workflow: >-
+            {{
+              ai_action_proposal_event.handoff.workflow
+              if ai_action_proposal_event is defined
+              else ''
+            }}

@@ -1,0 +1,13 @@
+---
+- name: Normalize pre-restore verify action
+  ansible.builtin.set_fact:
+    kernel_cve_radar_remediation_action: verify_fixed_site
+    kernel_cve_radar_verify_stage: pre_restore
+  when: kernel_cve_radar_remediation_action == 'verify_fixed_site_pre_restore'
+
+- name: Run compact preflight checks
+  ansible.builtin.include_tasks: preflight.yml
+  when: kernel_cve_radar_remediation_action != 'send_slack_alert'
+
+- name: Run requested remediation action
+  ansible.builtin.include_tasks: "{{ kernel_cve_radar_remediation_action }}.yml"

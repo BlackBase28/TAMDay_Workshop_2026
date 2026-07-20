@@ -1,0 +1,132 @@
+---
+# Machine-readable workshop object manifest for the pre-class AAP API bootstrap.
+# Create these objects independently inside every student's Organization, while
+# pointing both Project types to the same public Git repository and revision.
+
+project:
+  execution_project_name: TAM Day Workshop
+  decisions_project_name: TAM Day Workshop Decisions
+  scm_type: git
+  scm_url: https://github.com/REPLACE_ME/TAMDay-Workshop.git
+  scm_branch: workshop-v1.0
+  scm_credential_required: false
+  update_on_launch: false
+
+inventory:
+  name: CVE Radar Inventory
+  group: cve_radar
+  use_machine_credential: true
+
+credential_types:
+  ai_model:
+    name: TAM Day AI Model
+    injectors:
+      extra_vars:
+        ai_model_url: "{{ ai_risk_webhook_url }}"
+        ai_validate_certs: "{{ ai_validate_certs }}"
+      env:
+        AI_RISK_WEBHOOK_TOKEN: "{{ ai_risk_webhook_token }}"
+
+  rhel_mcp:
+    name: TAM Day RHEL MCP
+    injectors:
+      extra_vars:
+        rhel_mcp_url: "{{ rhel_mcp_url }}"
+        rhel_mcp_validate_certs: "{{ rhel_mcp_validate_certs }}"
+      env:
+        RHEL_MCP_TOKEN: "{{ rhel_mcp_token }}"
+
+  event_stream_sender:
+    name: TAM Day Event Stream Sender
+    injectors:
+      extra_vars:
+        eda_event_stream_url: "{{ eda_event_stream_url }}"
+        eda_event_stream_token: "{{ eda_event_stream_token }}"
+        eda_event_stream_auth_header: "{{ eda_event_stream_auth_header }}"
+        eda_event_stream_verify_tls: "{{ eda_event_stream_verify_tls }}"
+      env:
+        EDA_EVENT_STREAM_URL: "{{ eda_event_stream_url }}"
+        EDA_EVENT_STREAM_TOKEN: "{{ eda_event_stream_token }}"
+
+job_templates:
+  - name: CVE Radar - Deploy Event Forwarder
+    playbook: playbooks/deploy_forwarder.yml
+    inventory: CVE Radar Inventory
+    credentials: [machine, event_stream_sender]
+    ask_variables_on_launch: false
+
+  - name: CVE Radar - AI Risk Analysis
+    playbook: playbooks/eda_ai_risk_analysis.yml
+    inventory: CVE Radar Inventory
+    credentials: [ai_model, rhel_mcp, event_stream_sender]
+    ask_variables_on_launch: true
+
+  - name: CVE Radar - Record Suspicious Login Review
+    playbook: playbooks/suspicious_login_review.yml
+    inventory: CVE Radar Inventory
+    credentials: []
+    ask_variables_on_launch: true
+
+  - name: CVE Radar - Enable Maintenance
+    playbook: playbooks/enable_maintenance_page.yml
+    inventory: CVE Radar Inventory
+    credentials: [machine]
+
+  - name: CVE Radar - Deploy Repaired Website
+    playbook: playbooks/sync_solution_from_git_and_deploy.yml
+    inventory: CVE Radar Inventory
+    credentials: [machine]
+
+  - name: CVE Radar - Verify Fixed Site Before Restore
+    playbook: playbooks/verify_fixed_site_before_restore.yml
+    inventory: CVE Radar Inventory
+    credentials: [machine]
+
+  - name: CVE Radar - Restore Login Page
+    playbook: playbooks/restore_login_page.yml
+    inventory: CVE Radar Inventory
+    credentials: [machine]
+
+  - name: CVE Radar - Verify Fixed Site
+    playbook: playbooks/verify_fixed_site.yml
+    inventory: CVE Radar Inventory
+    credentials: [machine]
+
+  - name: CVE Radar - Reset Lab
+    playbook: playbooks/sync_start_from_git_and_deploy.yml
+    inventory: CVE Radar Inventory
+    credentials: [machine]
+
+workflows:
+  governed_web_remediation:
+    name: CVE Radar - Governed Web Remediation
+    ask_variables_on_launch: true
+    ask_limit_on_launch: true
+    student_completes_workflow: true
+    recommended_nodes:
+      - CVE Radar - Enable Maintenance
+      - Approval: Approve governed web remediation
+      - CVE Radar - Deploy Repaired Website
+      - CVE Radar - Verify Fixed Site Before Restore
+      - CVE Radar - Restore Login Page
+      - CVE Radar - Verify Fixed Site
+
+  suspicious_login_review:
+    name: CVE Radar - Suspicious Login Review
+    ask_variables_on_launch: true
+    ask_limit_on_launch: false
+    student_completes_workflow: true
+    recommended_nodes:
+      - CVE Radar - Record Suspicious Login Review
+      - Approval: Review suspicious successful login
+
+event_driven_ansible:
+  event_stream_name: CVE Radar Event Stream
+  rulebook: extensions/eda/rulebooks/cve_radar_authentication_anomaly.yml
+  activation_name: CVE Radar Security Event Activation
+  activation_enabled_before_class: false
+  activation_variables:
+    cve_radar_aap_organization: "{organization}"
+    cve_radar_ai_job_template_name: CVE Radar - AI Risk Analysis
+    cve_radar_web_remediation_workflow_name: CVE Radar - Governed Web Remediation
+    cve_radar_suspicious_login_review_workflow_name: CVE Radar - Suspicious Login Review

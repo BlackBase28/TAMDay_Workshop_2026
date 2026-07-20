@@ -1,0 +1,50 @@
+---
+- name: Remove previous temporary Git sync directory
+  ansible.builtin.file:
+    path: "{{ kernel_cve_radar_sync_temp_dir }}"
+    state: absent
+
+- name: Clone requested application repo revision
+  ansible.builtin.git:
+    repo: "{{ kernel_cve_radar_repo_url }}"
+    dest: "{{ kernel_cve_radar_sync_temp_dir }}"
+    version: "{{ kernel_cve_radar_repo_version }}"
+    force: true
+    update: true
+
+- name: Check requested source folder in cloned repo
+  ansible.builtin.stat:
+    path: "{{ kernel_cve_radar_sync_temp_dir }}/{{ kernel_cve_radar_sync_remote_folder }}"
+  register: kernel_cve_radar_remote_folder_stat
+
+- name: Fail when requested source folder is missing
+  ansible.builtin.fail:
+    msg: "{{ kernel_cve_radar_sync_remote_folder }}/ was not found in {{ kernel_cve_radar_repo_url }} revision {{ kernel_cve_radar_repo_version }}."
+  when: not kernel_cve_radar_remote_folder_stat.stat.isdir | default(false)
+
+- name: Replace local source folder with Git copy
+  ansible.builtin.file:
+    path: "{{ kernel_cve_radar_sync_dest_dir }}"
+    state: absent
+
+- name: Recreate local source folder
+  ansible.builtin.file:
+    path: "{{ kernel_cve_radar_sync_dest_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Copy requested source folder to target layout
+  ansible.builtin.copy:
+    src: "{{ kernel_cve_radar_sync_temp_dir }}/{{ kernel_cve_radar_sync_remote_folder }}/"
+    dest: "{{ kernel_cve_radar_sync_dest_dir }}/"
+    remote_src: true
+    owner: root
+    group: root
+    mode: preserve
+
+- name: Remove temporary Git sync directory
+  ansible.builtin.file:
+    path: "{{ kernel_cve_radar_sync_temp_dir }}"
+    state: absent

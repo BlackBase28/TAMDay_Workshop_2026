@@ -1,0 +1,8 @@
+*.retry
+*.pyc
+__pycache__/
+.venv/
+.env
+*.log
+bootstrap-output*.csv
+students.csv

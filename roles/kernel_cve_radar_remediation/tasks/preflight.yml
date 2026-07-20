@@ -1,0 +1,24 @@
+---
+- name: Enforce canonical backend container name
+  ansible.builtin.assert:
+    that:
+      - kernel_cve_radar_container_name == kernel_cve_radar_canonical_container_name
+    fail_msg: "Use the canonical backend container name: {{ kernel_cve_radar_canonical_container_name }}"
+
+- name: Verify required commands exist
+  ansible.builtin.command: "command -v {{ item }}"
+  changed_when: false
+  loop:
+    - podman
+    - git
+    - apachectl
+
+- name: Verify application root exists
+  ansible.builtin.stat:
+    path: "{{ kernel_cve_radar_app_dir }}"
+  register: kernel_cve_radar_app_root_stat
+
+- name: Fail when application root is missing
+  ansible.builtin.fail:
+    msg: "{{ kernel_cve_radar_app_dir }} does not exist. Deploy Kernel CVE Radar first or set kernel_cve_radar_app_dir."
+  when: not kernel_cve_radar_app_root_stat.stat.exists
