@@ -39,3 +39,16 @@ cve_radar_forwarder_poll_interval: 1.0
 
 # Lab 2 trigger: every successful admin login is forwarded to EDA.
 # AI uses RHEL MCP to inspect the preceding five-minute authentication window.
+
+# RHEL MCP log read access.
+# This is independent from whether the Forwarder forwards HTTP access events.
+cve_radar_mcp_log_access_enabled: true
+cve_radar_mcp_user: lab-user
+
+# Lab 2 requires the structured authentication log.
+cve_radar_mcp_read_auth_log: true
+
+# Lab 1 may use Apache access/error logs as supporting evidence.
+cve_radar_mcp_read_httpd_logs: true
+cve_radar_httpd_error_log: /var/log/httpd/error_log
+cve_radar_mcp_validate_log_access: true
