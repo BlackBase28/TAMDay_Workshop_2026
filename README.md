@@ -45,6 +45,8 @@ admin login succeeds
 - Review record: `playbooks/suspicious_login_review.yml`
 - Git defaults: `playbooks/vars/ai_risk_analysis_defaults.yml`
 - Forwarder deployment: `playbooks/deploy_forwarder.yml`
+
+The Forwarder deployment uses the AAP Machine Credential or inventory connection variables for SSH authentication. It does not load host passwords from the Git Project.
 - Rulebook: `extensions/eda/rulebooks/cve_radar_authentication_anomaly.yml`
 
 Job Template Extra Variables can remain empty. Tokens remain in AAP Credentials.

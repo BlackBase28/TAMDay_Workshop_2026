@@ -7,4 +7,3 @@ secrets.yml
 *.pyc
 __pycache__/
 decision-environment/context/
-vars/host_passwords.yml

@@ -3,10 +3,7 @@
   hosts: all
   become: true
   gather_facts: true
-  vars_files:
-    - ../vars/host_passwords.yml
-  vars:
-    ansible_password: "{{ cve_radar_host_passwords[inventory_hostname] }}"
+  # SSH authentication is supplied by the AAP Machine Credential or inventory.
   # cve_radar_mcp_user defaults to ansible_user. Override it when the RHEL MCP
   # policy connects with a different SSH account.
   roles:

@@ -158,6 +158,23 @@ Expected Forwarder event key:
 kernel-cve-radar.authentication.admin.login.success
 ```
 
+## AAP connection credential
+
+Attach a Machine Credential to the `Deploy Event Forwarder` Job Template. The
+credential supplies the SSH username and password or private key used before
+`Gathering Facts`. Do not place host passwords in the Git Project and do not
+define `cve_radar_host_passwords`. Inventory variables may still supply standard
+Ansible connection variables when required.
+
+Typical Workshop settings are:
+
+```text
+Credential type: Machine
+Username: lab-user
+Password or SSH private key: environment-specific
+Privilege escalation method: sudo
+```
+
 ## RHEL MCP log read permissions
 
 `deploy_forwarder.yml` now grants the RHEL MCP SSH account read-only ACLs for the evidence logs used by AI Analysis. The default account is `ansible_user`; override it when the MCP policy uses another SSH user:

@@ -210,6 +210,14 @@ class ProjectContractTests(unittest.TestCase):
         self.assertIn("login_failures", self.rulebook_text)
 
 
+    def test_forwarder_deployment_uses_aap_connection_credential(self):
+        deploy = (ROOT / "playbooks/deploy_forwarder.yml").read_text()
+        self.assertNotIn("cve_radar_host_passwords", deploy)
+        self.assertNotIn("vars/host_passwords.yml", deploy)
+        self.assertNotIn("ansible_password:", deploy)
+        self.assertIn("AAP Machine Credential", deploy)
+
+
     def test_forwarder_role_configures_mcp_log_acl(self):
         defaults = (ROOT / "playbooks/roles/cve_radar_eda_forwarder/defaults/main.yml").read_text()
         tasks = (ROOT / "playbooks/roles/cve_radar_eda_forwarder/tasks/main.yml").read_text()

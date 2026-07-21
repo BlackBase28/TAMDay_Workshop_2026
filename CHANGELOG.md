@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.9.5-slim12
+
+- Remove the mandatory Project-local `vars/host_passwords.yml` dependency from `deploy_forwarder.yml`.
+- Stop overriding `ansible_password` with `cve_radar_host_passwords[inventory_hostname]`.
+- Use the AAP Machine Credential or inventory connection variables as the authoritative SSH authentication source.
+- Preserve the slim11 MCP log-reader ACL behavior and all Forwarder/Event Stream settings.
+
 ## 1.9.5-slim11
 
 - Grant the configured RHEL MCP SSH user read-only POSIX ACL access to application authentication evidence logs during Forwarder deployment.
