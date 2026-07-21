@@ -70,3 +70,5 @@ sudo ./tests/send_test_event.sh append-login-sequence \
 ```
 
 Setup details are in `docs/SETUP.md`.
+
+- Journal permission verification uses `setpriv --init-groups` so an existing AAP SSH session does not cause a false failure immediately after group membership changes.

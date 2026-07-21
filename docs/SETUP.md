@@ -231,3 +231,23 @@ sudo -u lab-user journalctl --quiet --no-pager --lines 5
 Supplementary groups are applied when a new login session is created. If RHEL
 MCP already has a persistent SSH connection, restart the RHEL MCP service or Pod
 (or otherwise force a new SSH session) before retesting `get_journal_logs`.
+
+
+### Why deployment verification uses setpriv
+
+AAP commonly connects to the target as the same account configured for RHEL MCP,
+for example `lab-user`. Ansible normally skips `become` when the remote user and
+`become_user` are identical, so that existing SSH process keeps the supplementary
+groups it had when the connection was created. Immediately after adding
+`lab-user` to `systemd-journal`, a plain `become_user: lab-user` journal test can
+therefore report a false permission failure.
+
+The role validates the new permission using root plus:
+
+```bash
+setpriv --reuid=lab-user --regid="$(id -g lab-user)" --init-groups \
+  journalctl --quiet --no-pager --lines 1
+```
+
+This creates a fresh process credential set from the current user/group database.
+RHEL MCP itself must still create a new SSH connection after the deployment.

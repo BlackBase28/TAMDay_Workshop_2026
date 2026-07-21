@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.9.5-slim17
+
+- Fix the journal-read verification false failure that occurred when the AAP SSH user and `become_user` were both `lab-user`.
+- Resolve the MCP user's primary GID and run `journalctl` through `setpriv --init-groups`, forcing a fresh supplementary-group vector from the account database.
+- Keep `lab-user` membership in `systemd-journal` as the persistent least-privilege permission model.
+- Preserve the requirement that an already-running RHEL MCP process must establish a new SSH session after group membership changes.
+- Preserve slim16 journal membership management, slim15 ACL-mask correction, and all earlier Forwarder/AI behavior.
+
 ## 1.9.5-slim16
 
 - Grant the configured RHEL MCP SSH user least-privilege system journal read access by appending it to `systemd-journal`.
@@ -9,7 +17,7 @@
 - Preserve slim15 ACL mask correction, HTTPD/application log ACLs, stable collector hostname, and all governed AI behavior.
 
 
-## 1.9.5-slim16
+## 1.9.5-slim15
 
 - Fix `ansible.posix.acl` argument validation by replacing unsupported boolean `recalculate_mask: true` values with the supported string value `recalculate_mask: "mask"`.
 - Apply the correction to both Forwarder and RHEL MCP HTTPD access/default/file ACL tasks.

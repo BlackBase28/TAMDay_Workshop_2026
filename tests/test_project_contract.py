@@ -227,7 +227,7 @@ class ProjectContractTests(unittest.TestCase):
         self.assertIn('cve_radar_collector_hostname: "{{ inventory_hostname }}"', defaults)
         self.assertIn('COLLECTOR_HOSTNAME={{ cve_radar_collector_hostname | trim | quote }}', env_template)
         self.assertIn('${COLLECTOR_HOSTNAME:-$(hostname -f', helper)
-        self.assertIn('VERSION = "1.9.5-slim16"', self.forwarder_text)
+        self.assertIn('VERSION = "1.9.5-slim17"', self.forwarder_text)
 
 
     def test_acl_mask_recalculation_uses_supported_enum(self):
@@ -258,9 +258,15 @@ class ProjectContractTests(unittest.TestCase):
         self.assertIn('groups:\n      - "{{ cve_radar_mcp_journal_group }}"', tasks)
         self.assertIn("append: true", tasks)
         self.assertIn("Verify MCP user journal group membership", tasks)
-        self.assertIn("Verify MCP user can read system journal", tasks)
+        self.assertIn("Resolve MCP user primary group ID for fresh journal verification", tasks)
+        self.assertIn("Verify MCP user can read system journal with refreshed groups", tasks)
+        self.assertIn("/usr/bin/setpriv", tasks)
+        self.assertIn('"--reuid={{ cve_radar_mcp_user }}"', tasks)
+        self.assertIn('"--regid={{ cve_radar_mcp_primary_gid.stdout | trim }}"', tasks)
+        self.assertIn("--init-groups", tasks)
         self.assertIn("/usr/bin/journalctl", tasks)
-        self.assertIn('become_user: "{{ cve_radar_mcp_user }}"', tasks)
+        journal_block = tasks.split("- name: Verify MCP user can read system journal with refreshed groups", 1)[1].split("\n- name:", 1)[0]
+        self.assertNotIn('become_user: "{{ cve_radar_mcp_user }}"', journal_block)
 
 
 if __name__ == "__main__":

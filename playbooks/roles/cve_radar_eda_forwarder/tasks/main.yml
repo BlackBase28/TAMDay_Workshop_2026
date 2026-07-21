@@ -152,16 +152,31 @@
     - cve_radar_mcp_journal_access_enabled | bool
     - cve_radar_mcp_user | trim | length > 0
 
-- name: Verify MCP user can read system journal
+- name: Resolve MCP user primary group ID for fresh journal verification
   ansible.builtin.command:
     argv:
+      - /usr/bin/id
+      - -g
+      - "{{ cve_radar_mcp_user }}"
+  register: cve_radar_mcp_primary_gid
+  changed_when: false
+  when:
+    - cve_radar_mcp_journal_access_enabled | bool
+    - cve_radar_mcp_user | trim | length > 0
+
+- name: Verify MCP user can read system journal with refreshed groups
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/setpriv
+      - "--reuid={{ cve_radar_mcp_user }}"
+      - "--regid={{ cve_radar_mcp_primary_gid.stdout | trim }}"
+      - --init-groups
       - /usr/bin/journalctl
       - --quiet
       - --no-pager
       - --lines
       - "1"
   become: true
-  become_user: "{{ cve_radar_mcp_user }}"
   changed_when: false
   when:
     - cve_radar_mcp_journal_access_enabled | bool
