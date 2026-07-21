@@ -48,5 +48,10 @@ cve_radar_mcp_user: "{{ ansible_user | default('', true) }}"
 cve_radar_mcp_read_application_logs: true
 cve_radar_mcp_read_httpd_logs: true
 
+# get_journal_logs runs journalctl as the RHEL MCP SSH user. Membership in
+# systemd-journal is the least-privilege method for reading the system journal.
+cve_radar_mcp_journal_access_enabled: true
+cve_radar_mcp_journal_group: systemd-journal
+
 # Lab 2 trigger: every successful admin login is forwarded to EDA.
 # AI uses RHEL MCP to inspect the preceding five-minute authentication window.

@@ -200,6 +200,8 @@ cve_radar_mcp_log_acl_enabled: true
 cve_radar_mcp_user: lab-user
 cve_radar_mcp_read_application_logs: true
 cve_radar_mcp_read_httpd_logs: true
+cve_radar_mcp_journal_access_enabled: true
+cve_radar_mcp_journal_group: systemd-journal
 ```
 
 Application-log access includes `/var/log/kernel-cve-radar/auth-events.jsonl`. HTTPD access includes existing access and error logs under `/var/log/httpd`. Set `cve_radar_mcp_read_httpd_logs: false` when only Lab 2 authentication evidence is required. The role uses POSIX ACLs and does not change the file owner or globally-readable mode. The role applies both an access ACL (`u:<mcp-user>:r-x`) to `/var/log/httpd` and a default ACL for future logrotate-created files, then verifies every existing HTTPD evidence log as the MCP user.
@@ -210,3 +212,22 @@ Verify after deployment:
 sudo -u lab-user test -r /var/log/kernel-cve-radar/auth-events.jsonl
 sudo -u lab-user test -r /var/log/httpd/access_log
 ```
+
+
+### RHEL MCP journal permissions
+
+`get_journal_logs` executes `journalctl` as `cve_radar_mcp_user`. The deployment
+role therefore appends that account to the least-privilege
+`systemd-journal` group and verifies journal readability while impersonating the
+same user.
+
+Verify after deployment:
+
+```bash
+id lab-user
+sudo -u lab-user journalctl --quiet --no-pager --lines 5
+```
+
+Supplementary groups are applied when a new login session is created. If RHEL
+MCP already has a persistent SSH connection, restart the RHEL MCP service or Pod
+(or otherwise force a new SSH session) before retesting `get_journal_logs`.

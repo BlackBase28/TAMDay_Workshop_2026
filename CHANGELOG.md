@@ -1,6 +1,15 @@
 # Changelog
 
-## 1.9.5-slim15
+## 1.9.5-slim16
+
+- Grant the configured RHEL MCP SSH user least-privilege system journal read access by appending it to `systemd-journal`.
+- Add configurable `cve_radar_mcp_journal_access_enabled` and `cve_radar_mcp_journal_group` defaults.
+- Validate the journal group, verify supplementary-group membership, and execute a real `journalctl` readability check as the MCP user during Forwarder deployment.
+- Document that a new RHEL MCP SSH session is required after group membership changes.
+- Preserve slim15 ACL mask correction, HTTPD/application log ACLs, stable collector hostname, and all governed AI behavior.
+
+
+## 1.9.5-slim16
 
 - Fix `ansible.posix.acl` argument validation by replacing unsupported boolean `recalculate_mask: true` values with the supported string value `recalculate_mask: "mask"`.
 - Apply the correction to both Forwarder and RHEL MCP HTTPD access/default/file ACL tasks.

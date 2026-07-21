@@ -104,22 +104,68 @@
     - cve_radar_web_access_enabled | bool
     - item.stat.exists | default(false)
 
-- name: Validate MCP log reader account
+- name: Validate MCP evidence reader account
   ansible.builtin.getent:
     database: passwd
     key: "{{ cve_radar_mcp_user }}"
   when:
-    - cve_radar_mcp_log_acl_enabled | bool
+    - (cve_radar_mcp_log_acl_enabled | bool) or (cve_radar_mcp_journal_access_enabled | bool)
     - cve_radar_mcp_user | trim | length > 0
 
-- name: Fail when MCP log reader account is not configured
+- name: Fail when MCP evidence reader account is not configured
   ansible.builtin.assert:
     that:
       - cve_radar_mcp_user | trim | length > 0
     fail_msg: >-
-      cve_radar_mcp_log_acl_enabled is true, but cve_radar_mcp_user is empty.
+      RHEL MCP evidence access is enabled, but cve_radar_mcp_user is empty.
       Set it to the SSH user configured in the RHEL MCP policy, for example lab-user.
-  when: cve_radar_mcp_log_acl_enabled | bool
+  when:
+    - (cve_radar_mcp_log_acl_enabled | bool) or (cve_radar_mcp_journal_access_enabled | bool)
+
+- name: Validate configured journal reader group
+  ansible.builtin.getent:
+    database: group
+    key: "{{ cve_radar_mcp_journal_group }}"
+  when:
+    - cve_radar_mcp_journal_access_enabled | bool
+
+- name: Grant MCP user system journal read access
+  ansible.builtin.user:
+    name: "{{ cve_radar_mcp_user }}"
+    groups:
+      - "{{ cve_radar_mcp_journal_group }}"
+    append: true
+  when:
+    - cve_radar_mcp_journal_access_enabled | bool
+    - cve_radar_mcp_user | trim | length > 0
+
+- name: Verify MCP user journal group membership
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/id
+      - -nG
+      - "{{ cve_radar_mcp_user }}"
+  register: cve_radar_mcp_journal_groups
+  changed_when: false
+  failed_when: cve_radar_mcp_journal_group not in cve_radar_mcp_journal_groups.stdout.split()
+  when:
+    - cve_radar_mcp_journal_access_enabled | bool
+    - cve_radar_mcp_user | trim | length > 0
+
+- name: Verify MCP user can read system journal
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/journalctl
+      - --quiet
+      - --no-pager
+      - --lines
+      - "1"
+  become: true
+  become_user: "{{ cve_radar_mcp_user }}"
+  changed_when: false
+  when:
+    - cve_radar_mcp_journal_access_enabled | bool
+    - cve_radar_mcp_user | trim | length > 0
 
 - name: Grant MCP user traversal access to application log directory
   ansible.posix.acl:
