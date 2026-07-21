@@ -7,6 +7,9 @@ cve_radar_event_stream_auth_scheme: "{{ eda_event_stream_auth_scheme | default('
 cve_radar_event_stream_verify_tls: "{{ eda_event_stream_verify_tls | default(false) | bool }}"
 cve_radar_event_stream_ca_file: "{{ eda_event_stream_ca_file | default('', true) }}"
 
+# Canonical hostname used in EDA events and as the governed RHEL MCP target.
+# Keep this aligned with the AAP Inventory host name and the RHEL MCP policy.
+cve_radar_forwarder_collector_hostname: "{{ inventory_hostname }}"
 cve_radar_forwarder_user: cve-radar-eda-forwarder
 cve_radar_forwarder_group: cve-radar-eda-forwarder
 cve_radar_forwarder_script: /usr/local/sbin/cve_radar_event_forwarder.py
