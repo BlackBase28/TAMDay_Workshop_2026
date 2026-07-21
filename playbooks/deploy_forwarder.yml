@@ -1,7 +1,13 @@
 ---
 - name: Deploy Kernel CVE Radar EDA forwarder
-  hosts: "{{ target_hosts | default('cve_radar', true) }}"
+  hosts: all
   become: true
   gather_facts: true
+  vars_files:
+    - ../vars/host_passwords.yml
+  vars:
+    ansible_password: "{{ cve_radar_host_passwords[inventory_hostname] }}"
+  # cve_radar_mcp_user defaults to ansible_user. Override it when the RHEL MCP
+  # policy connects with a different SSH account.
   roles:
     - cve_radar_eda_forwarder

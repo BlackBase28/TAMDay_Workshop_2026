@@ -7,9 +7,6 @@ cve_radar_event_stream_auth_scheme: "{{ eda_event_stream_auth_scheme | default('
 cve_radar_event_stream_verify_tls: "{{ eda_event_stream_verify_tls | default(false) | bool }}"
 cve_radar_event_stream_ca_file: "{{ eda_event_stream_ca_file | default('', true) }}"
 
-# Canonical hostname used in EDA events and as the governed RHEL MCP target.
-# Keep this aligned with the AAP Inventory host name and the RHEL MCP policy.
-cve_radar_forwarder_collector_hostname: "{{ inventory_hostname }}"
 cve_radar_forwarder_user: cve-radar-eda-forwarder
 cve_radar_forwarder_group: cve-radar-eda-forwarder
 cve_radar_forwarder_script: /usr/local/sbin/cve_radar_event_forwarder.py
@@ -25,6 +22,8 @@ cve_radar_auth_event_log: "{{ cve_radar_log_file | default('/var/log/kernel-cve-
 cve_radar_app_access_log: /var/log/kernel-cve-radar/access.log
 cve_radar_httpd_access_log: "{{ cve_radar_web_access_log | default('/var/log/httpd/access_log', true) }}"
 cve_radar_httpd_ssl_access_log: /var/log/httpd/ssl_access_log
+cve_radar_httpd_error_log: /var/log/httpd/error_log
+cve_radar_httpd_ssl_error_log: /var/log/httpd/ssl_error_log
 cve_radar_web_access_enabled: "{{ cve_radar_web_access_log_enabled | default(false) | bool }}"
 
 cve_radar_trusted_proxy_cidrs:
@@ -37,18 +36,12 @@ cve_radar_web_ignore_path_prefixes: [/static/, /assets/, /favicon.ico, /robots.t
 cve_radar_web_ignore_path_suffixes: [.css, .js, .map, .png, .jpg, .jpeg, .gif, .svg, .ico, .woff, .woff2, .ttf]
 cve_radar_forwarder_poll_interval: 1.0
 
+# RHEL MCP log-reader ACL settings. By default, grant the inventory SSH user
+# read-only access to the application authentication log and optional httpd logs.
+cve_radar_mcp_log_acl_enabled: true
+cve_radar_mcp_user: "{{ ansible_user | default('', true) }}"
+cve_radar_mcp_read_application_logs: true
+cve_radar_mcp_read_httpd_logs: true
+
 # Lab 2 trigger: every successful admin login is forwarded to EDA.
 # AI uses RHEL MCP to inspect the preceding five-minute authentication window.
-
-# RHEL MCP log read access.
-# This is independent from whether the Forwarder forwards HTTP access events.
-cve_radar_mcp_log_access_enabled: true
-cve_radar_mcp_user: lab-user
-
-# Lab 2 requires the structured authentication log.
-cve_radar_mcp_read_auth_log: true
-
-# Lab 1 may use Apache access/error logs as supporting evidence.
-cve_radar_mcp_read_httpd_logs: true
-cve_radar_httpd_error_log: /var/log/httpd/error_log
-cve_radar_mcp_validate_log_access: true

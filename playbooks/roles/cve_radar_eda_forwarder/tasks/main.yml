@@ -77,6 +77,93 @@
     - cve_radar_web_access_enabled | bool
     - item.stat.exists | default(false)
 
+- name: Validate MCP log reader account
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ cve_radar_mcp_user }}"
+  when:
+    - cve_radar_mcp_log_acl_enabled | bool
+    - cve_radar_mcp_user | trim | length > 0
+
+- name: Fail when MCP log reader account is not configured
+  ansible.builtin.assert:
+    that:
+      - cve_radar_mcp_user | trim | length > 0
+    fail_msg: >-
+      cve_radar_mcp_log_acl_enabled is true, but cve_radar_mcp_user is empty.
+      Set it to the SSH user configured in the RHEL MCP policy, for example lab-user.
+  when: cve_radar_mcp_log_acl_enabled | bool
+
+- name: Grant MCP user traversal access to application log directory
+  ansible.posix.acl:
+    path: "{{ cve_radar_log_dir }}"
+    entity: "{{ cve_radar_mcp_user }}"
+    etype: user
+    permissions: rx
+    default: "{{ item }}"
+    state: present
+  loop:
+    - false
+    - true
+  when:
+    - cve_radar_mcp_log_acl_enabled | bool
+    - cve_radar_mcp_read_application_logs | bool
+
+- name: Grant MCP user read access to application evidence logs
+  ansible.posix.acl:
+    path: "{{ item }}"
+    entity: "{{ cve_radar_mcp_user }}"
+    etype: user
+    permissions: r
+    state: present
+  loop:
+    - "{{ cve_radar_auth_event_log }}"
+    - "{{ cve_radar_app_access_log }}"
+  when:
+    - cve_radar_mcp_log_acl_enabled | bool
+    - cve_radar_mcp_read_application_logs | bool
+
+- name: Check httpd evidence paths for MCP access
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - /var/log/httpd
+    - "{{ cve_radar_httpd_access_log }}"
+    - "{{ cve_radar_httpd_ssl_access_log }}"
+    - "{{ cve_radar_httpd_error_log }}"
+    - "{{ cve_radar_httpd_ssl_error_log }}"
+  register: cve_radar_mcp_httpd_stats
+  when:
+    - cve_radar_mcp_log_acl_enabled | bool
+    - cve_radar_mcp_read_httpd_logs | bool
+
+- name: Grant MCP user read-only access to available httpd evidence paths
+  ansible.posix.acl:
+    path: "{{ item.item }}"
+    entity: "{{ cve_radar_mcp_user }}"
+    etype: user
+    permissions: "{{ 'rx' if item.item == '/var/log/httpd' else 'r' }}"
+    default: "{{ item.item == '/var/log/httpd' }}"
+    state: present
+  loop: "{{ cve_radar_mcp_httpd_stats.results | default([]) }}"
+  when:
+    - cve_radar_mcp_log_acl_enabled | bool
+    - cve_radar_mcp_read_httpd_logs | bool
+    - item.stat.exists | default(false)
+
+- name: Verify MCP user can read primary authentication evidence log
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/test
+      - -r
+      - "{{ cve_radar_auth_event_log }}"
+  become: true
+  become_user: "{{ cve_radar_mcp_user }}"
+  changed_when: false
+  when:
+    - cve_radar_mcp_log_acl_enabled | bool
+    - cve_radar_mcp_read_application_logs | bool
+
 - name: Create forwarder state directory
   ansible.builtin.file:
     path: "{{ cve_radar_forwarder_state_dir }}"

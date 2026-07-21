@@ -1,4 +1,10 @@
-__pycache__/
-*.py[cod]
+*.retry
 *.log
-.venv/
+.env
+secrets.yml
+.vault_pass
+*.vault_pass
+*.pyc
+__pycache__/
+decision-environment/context/
+vars/host_passwords.yml

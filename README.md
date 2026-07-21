@@ -1,91 +1,69 @@
-# TAM Day CVE Radar Workshop
+# TAM Day – Governed EDA Security Investigation
 
-Version: `1.0.2`
+Git-managed project based on the proven **V1.9.5** runtime baseline.
 
-Repository name: `TAMDay_Workshop`
+## Active labs
 
-此 Repository 是學員在 TAM Day Workshop 中使用的單一 AAP Project，只保留 Lab 執行與學員設定所需的 EDA Rulebook、AI/MCP 分析 Playbook、Forwarder、Remediation Playbook／Role、Runtime dependency 定義及學員操作文件。
+| Lab | EDA trigger | AI investigation | Governed hand-off |
+|---|---|---|---|
+| Lab 1 | Non-admin successfully accesses `/admin` | Confirm broken access control | `CVE Radar - Governed Web Remediation` |
+| Lab 2 | Every successful `admin` login | RHEL MCP reads the auth log and counts `admin` login failures in the previous 5 minutes | Start `CVE Radar - Suspicious Login Review` only when failures ≥ 3 |
 
-課前 AAP 大量布建工具、帳號清單、Credential 建立邏輯與 AAP 物件定義不包含在本專案中，請使用獨立的 `TAMDay_Workshop-bootstrap` 套件。
+For Lab 2, the successful login is only a wake-up signal. Login failures remain
+in `/var/log/kernel-cve-radar/auth-events.jsonl` and are not individually sent to
+EDA. The Model plans a bounded MCP investigation, while the Adapter restricts it
+to `read_log_file`, `get_journal_logs`, and `get_service_status`. The Auth Log
+read remains mandatory because the Adapter applies the five-minute threshold
+after MCP evidence is collected.
 
-## 專案來源
+When fewer than three failures are found, the AI Job records `observe` and does
+not publish a Review proposal. The flow never locks the account, blocks an IP,
+enables maintenance mode, or changes the target host.
 
-- EDA / Governed AI investigation：`1.9.5-slim10`
-- Ansible MCP remediation：`0.2.2`
+The Adapter rebuilds the Lab 2 evidence summary from the parsed Auth Log records,
+so a Model-generated count cannot conflict with the governed five-minute count.
+When the Review Workflow is launched, it receives the failure timestamps,
+reasons, source IPs, and a formatted `workflow_review_summary` through
+`extra_vars`.
 
-## AAP Project 使用方式
-
-Automation Execution Project 與 Automation Decisions Project 可共同指向這個 Public Git Repository；透過 HTTPS 讀取公開 Repository 時不需要 SCM Credential。
-
-每位學員仍使用各自獨立的 Organization、Inventory、Credential、Job Template、Workflow、Event Stream 與 Rulebook Activation。這些物件由課前 Bootstrap 套件建立。
-
-## 已包含的必要元件
-
-| 類別 | 內容 |
-|---|---|
-| EDA | Event Stream Rulebook 與事件契約 |
-| Event Forwarder | Forwarder 部署 Playbook、Role、Python 程式、systemd 與環境檔模板 |
-| AI / MCP | AI Risk Analysis Playbook、Governed Adapter 與受控預設值 |
-| Remediation | 維護頁、solution 部署、修復驗證、恢復服務與 Lab Reset Playbook／Role |
-| Review flow | Suspicious Login Review 記錄 Playbook |
-| Dependencies | Ansible Collection requirements 與 Custom Runtime Image build definition |
-| Student guide | Workflow、Activation、Lab 觸發與驗證步驟 |
-
-`decision-environment/` 內的 `execution-environment.yml`、Python requirements 與 system dependencies 是 Governed Adapter 所需的 Custom Runtime Image build definition。課前需將建立完成的映像註冊為 AAP Execution Environment，並可同時作為 EDA Decision Environment 使用；學員不需要自行建立映像。
-
-## Lab 1：Broken access control
+## Active flow
 
 ```text
-user1 存取 /admin
-→ Forwarder 將事件送入 Event Stream
-→ Rulebook 啟動 AI Risk Analysis
-→ AI 透過受控 RHEL MCP 蒐集有限證據
-→ AI 回送 repair_web_code 提案
-→ Rulebook 啟動 Governed Web Remediation Workflow
-→ 學員執行 Approval
-→ AAP 部署 solution 並驗證修復
+admin login succeeds
+→ Forwarder sends admin.login.success
+→ EDA launches CVE Radar - AI Risk Analysis
+→ Model plans bounded MCP evidence collection
+→ Adapter permits only read_log_file/get_journal_logs/get_service_status
+→ Auth Log read counts admin failures during the previous 5 minutes
+├─ failures >= 3 → require_approval → Suspicious Login Review Workflow
+└─ failures < 3  → observe → no Workflow
 ```
 
-## Lab 2：Suspicious successful admin login
+## Runtime entry points
 
-```text
-admin 登入成功
-→ Forwarder 喚醒 EDA
-→ AI 透過 RHEL MCP 檢查最近 5 分鐘的登入紀錄
-├─ admin 登入失敗至少 3 次：啟動 Suspicious Login Review Workflow
-└─ 未達門檻：只記錄觀察結果，不啟動 Workflow
+- AI analysis: `playbooks/eda_ai_risk_analysis.yml`
+- Review record: `playbooks/suspicious_login_review.yml`
+- Git defaults: `playbooks/vars/ai_risk_analysis_defaults.yml`
+- Forwarder deployment: `playbooks/deploy_forwarder.yml`
+- Rulebook: `extensions/eda/rulebooks/cve_radar_authentication_anomaly.yml`
+
+Job Template Extra Variables can remain empty. Tokens remain in AAP Credentials.
+Rulebook Activation Variables can override the Organization, AI Job Template,
+and Workflow names.
+
+## Validation
+
+```bash
+./tests/verify_project.sh
+
+# Direct Event Stream smoke tests
+./tests/send_test_event.sh admin-access user1 192.168.1.104 /admin
+./tests/send_test_event.sh admin-login-success 192.168.1.104
+
+# End-to-end Lab 2 test through the Forwarder
+sudo ./tests/send_test_event.sh append-login-sequence \
+  192.168.1.104 3 \
+  /var/log/kernel-cve-radar/auth-events.jsonl
 ```
 
-此情境只進行審查與紀錄，不鎖定帳號、不封鎖 IP，也不修改目標主機。
-
-## AAP 執行入口
-
-| 用途 | 路徑 |
-|---|---|
-| 部署 Event Stream Forwarder | `playbooks/deploy_forwarder.yml` |
-| AI／MCP 調查 | `playbooks/eda_ai_risk_analysis.yml` |
-| 記錄異常登入審查 | `playbooks/suspicious_login_review.yml` |
-| 切換維護頁 | `playbooks/enable_maintenance_page.yml` |
-| 部署修復版本 | `playbooks/sync_solution_from_git_and_deploy.yml` |
-| 修復後、恢復服務前驗證 | `playbooks/verify_fixed_site_before_restore.yml` |
-| 恢復正常登入頁 | `playbooks/restore_login_page.yml` |
-| 驗證公開站台 | `playbooks/verify_fixed_site.yml` |
-| 重設為 vulnerable start 版本 | `playbooks/sync_start_from_git_and_deploy.yml` |
-| EDA Rulebook | `extensions/eda/rulebooks/cve_radar_authentication_anomaly.yml` |
-
-相容性入口 `playbooks/ai_dispatch_remediation.yml` 與選用的 `playbooks/send_slack_alert.yml` 亦保留在專案中，但不屬於學員主要 Lab 操作路徑。
-
-## 變數與 Credential 原則
-
-Job Template 的 Extra Variables 預設可維持空白：
-
-- 目標主機與 SSH：AAP Inventory 與 Machine Credential
-- AI Model：AAP Custom Credential
-- RHEL MCP：AAP Custom Credential
-- Event Stream URL／Token：AAP Custom Credential
-- 非敏感 AI 預設值：`playbooks/vars/ai_risk_analysis_defaults.yml`
-- 非敏感 Remediation 預設值：`vars/project_defaults.yml`
-
-只有 EDA 啟動 Job／Workflow 時產生的事件資料會以 Runtime Extra Variables 自動傳入，學員不需要手動貼入。
-
-學員操作流程請參考 `docs/STUDENT_LAB.md`；事件格式請參考 `docs/event-schema.md`。
+Setup details are in `docs/SETUP.md`.
