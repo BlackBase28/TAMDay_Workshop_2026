@@ -15,6 +15,11 @@ cve_radar_forwarder_service: cve-radar-eda-forwarder.service
 cve_radar_forwarder_state_dir: /var/lib/cve-radar-eda-forwarder
 cve_radar_forwarder_start_at_end: true
 
+# Stable hostname published in Event Stream payloads and used as the fixed
+# RHEL MCP target. Do not derive this from the remote OS FQDN because cloud
+# hosts can report an internal provider hostname.
+cve_radar_collector_hostname: "{{ inventory_hostname }}"
+
 cve_radar_log_dir: /var/log/kernel-cve-radar
 cve_radar_application_log_owner: "{{ cve_radar_log_owner | default(1001) }}"
 cve_radar_application_log_group: "{{ cve_radar_log_group | default(1001) }}"

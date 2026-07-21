@@ -110,6 +110,22 @@ env:
   EDA_EVENT_STREAM_TOKEN: '{{ eda_event_stream_token }}'
 ```
 
+## Stable Collector hostname
+
+The Forwarder publishes a stable target name in every Event Stream payload. By default it uses the AAP inventory host name rather than the remote operating system FQDN:
+
+```yaml
+cve_radar_collector_hostname: "{{ inventory_hostname }}"
+```
+
+Override it explicitly when the RHEL MCP policy uses a different host key:
+
+```yaml
+cve_radar_collector_hostname: rhel.l2mmh.sandbox1190.opentlc.com
+```
+
+The generated `/etc/cve-radar-eda-forwarder.env` contains `COLLECTOR_HOSTNAME`. This prevents AWS or other cloud internal names such as `ip-192-168-0-81.us-east-2.compute.internal` from being sent as the governed MCP target. Redeploy or restart the Forwarder after changing this value.
+
 ## Forwarder behavior
 
 The Forwarder watches the structured application Auth Log by default:

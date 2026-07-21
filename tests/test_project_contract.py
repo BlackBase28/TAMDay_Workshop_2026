@@ -11,6 +11,8 @@ DEFAULTS = ROOT / "playbooks/vars/ai_risk_analysis_defaults.yml"
 RULEBOOK = ROOT / "extensions/eda/rulebooks/cve_radar_authentication_anomaly.yml"
 FORWARDER = ROOT / "playbooks/roles/cve_radar_eda_forwarder/files/cve_radar_event_forwarder.py"
 REVIEW = ROOT / "playbooks/suspicious_login_review.yml"
+FORWARDER_DEFAULTS = ROOT / "playbooks/roles/cve_radar_eda_forwarder/defaults/main.yml"
+FORWARDER_ENV = ROOT / "playbooks/roles/cve_radar_eda_forwarder/templates/cve-radar-eda-forwarder.env.j2"
 
 
 class ProjectContractTests(unittest.TestCase):
@@ -216,6 +218,16 @@ class ProjectContractTests(unittest.TestCase):
         self.assertNotIn("vars/host_passwords.yml", deploy)
         self.assertNotIn("ansible_password:", deploy)
         self.assertIn("AAP Machine Credential", deploy)
+
+
+    def test_forwarder_publishes_inventory_hostname_for_mcp_target(self):
+        defaults = FORWARDER_DEFAULTS.read_text()
+        env_template = FORWARDER_ENV.read_text()
+        helper = (ROOT / "tests/send_test_event.sh").read_text()
+        self.assertIn('cve_radar_collector_hostname: "{{ inventory_hostname }}"', defaults)
+        self.assertIn('COLLECTOR_HOSTNAME={{ cve_radar_collector_hostname | trim | quote }}', env_template)
+        self.assertIn('${COLLECTOR_HOSTNAME:-$(hostname -f', helper)
+        self.assertIn('VERSION = "1.9.5-slim13"', self.forwarder_text)
 
 
     def test_forwarder_role_configures_mcp_log_acl(self):

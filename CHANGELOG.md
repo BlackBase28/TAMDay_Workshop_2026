@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.9.5-slim13
+
+- Add `cve_radar_collector_hostname`, defaulting to the AAP `inventory_hostname`.
+- Render `COLLECTOR_HOSTNAME` into the Forwarder environment so Event Stream payloads no longer fall back to cloud-internal `socket.getfqdn()` values.
+- Make direct Event Stream smoke tests reuse the deployed `COLLECTOR_HOSTNAME`.
+- Update the Forwarder component trace version to `1.9.5-slim13`.
+- Preserve slim12 Machine Credential authentication and slim11 MCP log ACL behavior.
+
 ## 1.9.5-slim12
 
 - Remove the mandatory Project-local `vars/host_passwords.yml` dependency from `deploy_forwarder.yml`.
