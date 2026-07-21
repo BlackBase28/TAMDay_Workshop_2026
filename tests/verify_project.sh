@@ -25,4 +25,4 @@ python3 -m py_compile \
 python3 -m unittest discover -s "$root/tests" -p 'test_*.py' -v
 find "$root" -type d -name __pycache__ -prune -exec rm -rf {} +
 find "$root" -type f -name '*.pyc' -delete
-echo "OK: V1.9.5-slim13 stable collector hostname and governed MCP target"
+echo "OK: V1.9.5-slim14 HTTPD access and inherited ACLs for Forwarder/MCP"

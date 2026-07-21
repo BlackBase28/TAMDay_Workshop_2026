@@ -227,7 +227,7 @@ class ProjectContractTests(unittest.TestCase):
         self.assertIn('cve_radar_collector_hostname: "{{ inventory_hostname }}"', defaults)
         self.assertIn('COLLECTOR_HOSTNAME={{ cve_radar_collector_hostname | trim | quote }}', env_template)
         self.assertIn('${COLLECTOR_HOSTNAME:-$(hostname -f', helper)
-        self.assertIn('VERSION = "1.9.5-slim13"', self.forwarder_text)
+        self.assertIn('VERSION = "1.9.5-slim14"', self.forwarder_text)
 
 
     def test_forwarder_role_configures_mcp_log_acl(self):
@@ -236,7 +236,10 @@ class ProjectContractTests(unittest.TestCase):
         self.assertIn("cve_radar_mcp_log_acl_enabled: true", defaults)
         self.assertIn("cve_radar_mcp_user:", defaults)
         self.assertIn("Grant MCP user read access to application evidence logs", tasks)
-        self.assertIn("Grant MCP user read-only access to available httpd evidence paths", tasks)
+        self.assertIn("Grant MCP user traversal access to httpd log directory", tasks)
+        self.assertIn("Grant MCP user inherited access to future httpd logs", tasks)
+        self.assertIn("Grant MCP user read access to available httpd evidence logs", tasks)
+        self.assertIn("Verify MCP user can read available httpd evidence logs", tasks)
         self.assertIn("Verify MCP user can read primary authentication evidence log", tasks)
 
 if __name__ == "__main__":

@@ -202,7 +202,7 @@ cve_radar_mcp_read_application_logs: true
 cve_radar_mcp_read_httpd_logs: true
 ```
 
-Application-log access includes `/var/log/kernel-cve-radar/auth-events.jsonl`. HTTPD access includes existing access and error logs under `/var/log/httpd`. Set `cve_radar_mcp_read_httpd_logs: false` when only Lab 2 authentication evidence is required. The role uses POSIX ACLs and does not change the file owner or globally-readable mode.
+Application-log access includes `/var/log/kernel-cve-radar/auth-events.jsonl`. HTTPD access includes existing access and error logs under `/var/log/httpd`. Set `cve_radar_mcp_read_httpd_logs: false` when only Lab 2 authentication evidence is required. The role uses POSIX ACLs and does not change the file owner or globally-readable mode. The role applies both an access ACL (`u:<mcp-user>:r-x`) to `/var/log/httpd` and a default ACL for future logrotate-created files, then verifies every existing HTTPD evidence log as the MCP user.
 
 Verify after deployment:
 

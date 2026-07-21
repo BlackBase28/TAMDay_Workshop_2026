@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.9.5-slim14
+
+- Fix HTTPD ACL deployment so `/var/log/httpd` receives a non-default access ACL for directory traversal, not only a default inheritance ACL.
+- Apply separate access and default ACL entries for both the Forwarder service account and the configured RHEL MCP SSH user.
+- Grant read ACLs to each existing HTTPD access/error log and explicitly recalculate the ACL mask.
+- Verify every existing HTTPD evidence log is readable while impersonating the MCP user.
+- Preserve slim13 stable collector hostname, slim12 Machine Credential authentication, and all governed AI behavior.
+
 ## 1.9.5-slim13
 
 - Add `cve_radar_collector_hostname`, defaulting to the AAP `inventory_hostname`.

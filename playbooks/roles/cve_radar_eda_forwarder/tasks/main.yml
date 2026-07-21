@@ -64,15 +64,42 @@
   register: cve_radar_httpd_stats
   when: cve_radar_web_access_enabled | bool
 
-- name: Grant forwarder access to available httpd paths
+- name: Grant forwarder traversal access to httpd log directory
+  ansible.posix.acl:
+    path: /var/log/httpd
+    entity: "{{ cve_radar_forwarder_user }}"
+    etype: user
+    permissions: rx
+    default: false
+    recalculate_mask: true
+    state: present
+  when:
+    - cve_radar_web_access_enabled | bool
+    - cve_radar_httpd_stats.results[0].stat.exists | default(false)
+
+- name: Grant forwarder inherited access to future httpd logs
+  ansible.posix.acl:
+    path: /var/log/httpd
+    entity: "{{ cve_radar_forwarder_user }}"
+    etype: user
+    permissions: rx
+    default: true
+    recalculate_mask: true
+    state: present
+  when:
+    - cve_radar_web_access_enabled | bool
+    - cve_radar_httpd_stats.results[0].stat.exists | default(false)
+
+- name: Grant forwarder read access to available httpd logs
   ansible.posix.acl:
     path: "{{ item.item }}"
     entity: "{{ cve_radar_forwarder_user }}"
     etype: user
-    permissions: "{{ 'rx' if item.item == '/var/log/httpd' else 'r' }}"
-    default: "{{ item.item == '/var/log/httpd' }}"
+    permissions: r
+    default: false
+    recalculate_mask: true
     state: present
-  loop: "{{ cve_radar_httpd_stats.results | default([]) }}"
+  loop: "{{ (cve_radar_httpd_stats.results | default([]))[1:] }}"
   when:
     - cve_radar_web_access_enabled | bool
     - item.stat.exists | default(false)
@@ -137,15 +164,59 @@
     - cve_radar_mcp_log_acl_enabled | bool
     - cve_radar_mcp_read_httpd_logs | bool
 
-- name: Grant MCP user read-only access to available httpd evidence paths
+- name: Grant MCP user traversal access to httpd log directory
+  ansible.posix.acl:
+    path: /var/log/httpd
+    entity: "{{ cve_radar_mcp_user }}"
+    etype: user
+    permissions: rx
+    default: false
+    recalculate_mask: true
+    state: present
+  when:
+    - cve_radar_mcp_log_acl_enabled | bool
+    - cve_radar_mcp_read_httpd_logs | bool
+    - cve_radar_mcp_httpd_stats.results[0].stat.exists | default(false)
+
+- name: Grant MCP user inherited access to future httpd logs
+  ansible.posix.acl:
+    path: /var/log/httpd
+    entity: "{{ cve_radar_mcp_user }}"
+    etype: user
+    permissions: rx
+    default: true
+    recalculate_mask: true
+    state: present
+  when:
+    - cve_radar_mcp_log_acl_enabled | bool
+    - cve_radar_mcp_read_httpd_logs | bool
+    - cve_radar_mcp_httpd_stats.results[0].stat.exists | default(false)
+
+- name: Grant MCP user read access to available httpd evidence logs
   ansible.posix.acl:
     path: "{{ item.item }}"
     entity: "{{ cve_radar_mcp_user }}"
     etype: user
-    permissions: "{{ 'rx' if item.item == '/var/log/httpd' else 'r' }}"
-    default: "{{ item.item == '/var/log/httpd' }}"
+    permissions: r
+    default: false
+    recalculate_mask: true
     state: present
-  loop: "{{ cve_radar_mcp_httpd_stats.results | default([]) }}"
+  loop: "{{ (cve_radar_mcp_httpd_stats.results | default([]))[1:] }}"
+  when:
+    - cve_radar_mcp_log_acl_enabled | bool
+    - cve_radar_mcp_read_httpd_logs | bool
+    - item.stat.exists | default(false)
+
+- name: Verify MCP user can read available httpd evidence logs
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/test
+      - -r
+      - "{{ item.item }}"
+  become: true
+  become_user: "{{ cve_radar_mcp_user }}"
+  changed_when: false
+  loop: "{{ (cve_radar_mcp_httpd_stats.results | default([]))[1:] }}"
   when:
     - cve_radar_mcp_log_acl_enabled | bool
     - cve_radar_mcp_read_httpd_logs | bool
