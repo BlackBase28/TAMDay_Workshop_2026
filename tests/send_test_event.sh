@@ -42,7 +42,7 @@ admin_event() {
   seq="$(date +%s%3N)"
   host="$(collector_hostname)"
   post_event "$(cat <<JSON
-{"schema_version":"kernel-cve-radar.event.v1","observed_at":"$ts","event_id":"$id","application":"kernel-cve-radar","event_type":"authorization","event_source":"application_auth_log","event_action":"admin_access","event_outcome":"allowed","username":"$user","user_role":"user","source_ip":"$ip","effective_source_ip":"$ip","url_path":"$path","status_code":200,"event_key":"kernel-cve-radar.authorization.admin.access","collector":{"name":"manual-test","version":"1.9.5-slim14","hostname":"$host","source_file":"/var/log/kernel-cve-radar/auth-events.jsonl","sequence":$seq}}
+{"schema_version":"kernel-cve-radar.event.v1","observed_at":"$ts","event_id":"$id","application":"kernel-cve-radar","event_type":"authorization","event_source":"application_auth_log","event_action":"admin_access","event_outcome":"allowed","username":"$user","user_role":"user","source_ip":"$ip","effective_source_ip":"$ip","url_path":"$path","status_code":200,"event_key":"kernel-cve-radar.authorization.admin.access","collector":{"name":"manual-test","version":"1.9.5-slim15","hostname":"$host","source_file":"/var/log/kernel-cve-radar/auth-events.jsonl","sequence":$seq}}
 JSON
 )"
 }
@@ -55,7 +55,7 @@ admin_login_success_event() {
   seq="$(date +%s%3N)"
   host="$(collector_hostname)"
   post_event "$(cat <<JSON
-{"schema_version":"kernel-cve-radar.event.v1","observed_at":"$ts","event_id":"$id","application":"kernel-cve-radar","event_type":"authentication","event_source":"application_auth_log","event_action":"login","event_outcome":"success","username":"admin","user_role":"admin","source_ip":"$ip","effective_source_ip":"$ip","url_path":"/login","status_code":200,"event_key":"kernel-cve-radar.authentication.admin.login.success","collector":{"name":"manual-test","version":"1.9.5-slim14","hostname":"$host","source_file":"/var/log/kernel-cve-radar/auth-events.jsonl","sequence":$seq}}
+{"schema_version":"kernel-cve-radar.event.v1","observed_at":"$ts","event_id":"$id","application":"kernel-cve-radar","event_type":"authentication","event_source":"application_auth_log","event_action":"login","event_outcome":"success","username":"admin","user_role":"admin","source_ip":"$ip","effective_source_ip":"$ip","url_path":"/login","status_code":200,"event_key":"kernel-cve-radar.authentication.admin.login.success","collector":{"name":"manual-test","version":"1.9.5-slim15","hostname":"$host","source_file":"/var/log/kernel-cve-radar/auth-events.jsonl","sequence":$seq}}
 JSON
 )"
 }

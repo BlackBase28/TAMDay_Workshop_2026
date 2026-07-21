@@ -227,7 +227,13 @@ class ProjectContractTests(unittest.TestCase):
         self.assertIn('cve_radar_collector_hostname: "{{ inventory_hostname }}"', defaults)
         self.assertIn('COLLECTOR_HOSTNAME={{ cve_radar_collector_hostname | trim | quote }}', env_template)
         self.assertIn('${COLLECTOR_HOSTNAME:-$(hostname -f', helper)
-        self.assertIn('VERSION = "1.9.5-slim14"', self.forwarder_text)
+        self.assertIn('VERSION = "1.9.5-slim15"', self.forwarder_text)
+
+
+    def test_acl_mask_recalculation_uses_supported_enum(self):
+        tasks = (ROOT / "playbooks/roles/cve_radar_eda_forwarder/tasks/main.yml").read_text()
+        self.assertNotRegex(tasks, r"recalculate_mask:\s*(true|false)\b")
+        self.assertEqual(tasks.count('recalculate_mask: "mask"'), 6)
 
 
     def test_forwarder_role_configures_mcp_log_acl(self):

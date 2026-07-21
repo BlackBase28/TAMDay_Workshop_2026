@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.9.5-slim15
+
+- Fix `ansible.posix.acl` argument validation by replacing unsupported boolean `recalculate_mask: true` values with the supported string value `recalculate_mask: "mask"`.
+- Apply the correction to both Forwarder and RHEL MCP HTTPD access/default/file ACL tasks.
+- Add a regression contract test that rejects boolean `recalculate_mask` values.
+- Preserve slim14 HTTPD directory traversal/read verification, slim13 stable collector hostname, and all previous behavior.
+
 ## 1.9.5-slim14
 
 - Fix HTTPD ACL deployment so `/var/log/httpd` receives a non-default access ACL for directory traversal, not only a default inheritance ACL.

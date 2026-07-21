@@ -47,7 +47,7 @@ admin login succeeds
 - Forwarder deployment: `playbooks/deploy_forwarder.yml`
 
 The Forwarder deployment uses the AAP Machine Credential or inventory connection variables for SSH authentication. It does not load host passwords from the Git Project.
-The Forwarder also publishes `cve_radar_collector_hostname` (default: `inventory_hostname`) so AI Analysis uses the inventory/MCP host key instead of a cloud provider internal OS hostname. HTTPD log ACL deployment applies both directory traversal access and inherited defaults, then validates readability as the configured MCP user.
+The Forwarder also publishes `cve_radar_collector_hostname` (default: `inventory_hostname`) so AI Analysis uses the inventory/MCP host key instead of a cloud provider internal OS hostname. HTTPD log ACL deployment applies both directory traversal access and inherited defaults, explicitly recalculates masks with the supported `mask` enum, then validates readability as the configured MCP user.
 - Rulebook: `extensions/eda/rulebooks/cve_radar_authentication_anomaly.yml`
 
 Job Template Extra Variables can remain empty. Tokens remain in AAP Credentials.

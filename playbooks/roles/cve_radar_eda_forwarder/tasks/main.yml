@@ -71,7 +71,7 @@
     etype: user
     permissions: rx
     default: false
-    recalculate_mask: true
+    recalculate_mask: "mask"
     state: present
   when:
     - cve_radar_web_access_enabled | bool
@@ -84,7 +84,7 @@
     etype: user
     permissions: rx
     default: true
-    recalculate_mask: true
+    recalculate_mask: "mask"
     state: present
   when:
     - cve_radar_web_access_enabled | bool
@@ -97,7 +97,7 @@
     etype: user
     permissions: r
     default: false
-    recalculate_mask: true
+    recalculate_mask: "mask"
     state: present
   loop: "{{ (cve_radar_httpd_stats.results | default([]))[1:] }}"
   when:
@@ -171,7 +171,7 @@
     etype: user
     permissions: rx
     default: false
-    recalculate_mask: true
+    recalculate_mask: "mask"
     state: present
   when:
     - cve_radar_mcp_log_acl_enabled | bool
@@ -185,7 +185,7 @@
     etype: user
     permissions: rx
     default: true
-    recalculate_mask: true
+    recalculate_mask: "mask"
     state: present
   when:
     - cve_radar_mcp_log_acl_enabled | bool
@@ -199,7 +199,7 @@
     etype: user
     permissions: r
     default: false
-    recalculate_mask: true
+    recalculate_mask: "mask"
     state: present
   loop: "{{ (cve_radar_mcp_httpd_stats.results | default([]))[1:] }}"
   when:
