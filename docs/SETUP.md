@@ -345,3 +345,21 @@ shows:
 
 This makes the behavior difference between the selected 4B and 30B models
 visible without changing the Playbook or Execution Environment.
+
+
+## ntfy UTF-8 JSON publishing
+
+The ntfy Workflow Playbook uses the official JSON publish format. It derives
+the server root and topic from the complete `ntfy_url`, then sends title,
+message, tags, and priority in a UTF-8 JSON body instead of HTTP headers.
+
+```yaml
+ntfy_url: "https://ntfy.sh/tamday-user01-randomstring"
+ntfy_title: "CVE Radar 修復完成"
+ntfy_message: "網站已完成修復並通過驗證。"
+ntfy_priority: default
+ntfy_tags: "white_check_mark,robot"
+```
+
+Supported priority names are `min`, `low`, `default`, `high`, `max`, and
+`urgent`.

@@ -1,6 +1,19 @@
 # Changelog
 
-## 1.9.5-slim23
+## 1.9.5-slim24
+
+- Fix ntfy failures when Traditional Chinese titles are encoded as HTTP
+  headers (`'latin-1' codec can't encode characters`).
+- Switch the standalone ntfy Workflow Playbook to the official JSON publish
+  API with UTF-8 title and message fields.
+- Keep accepting a complete `ntfy_url` topic URL and derive the server root and
+  topic automatically.
+- Map `min`, `low`, `default`, `high`, `max`, and `urgent` to ntfy JSON
+  priorities.
+- Preserve slim23 explicit AI Model selection and raw response comparison.
+
+
+## 1.9.5-slim24
 
 - Remove the Project defaults for `ai_model_url` and `ai_model`; both must be
   selected explicitly by the AI Analysis Job Template or launch.
@@ -14,7 +27,7 @@
   governed MCP controls, and corrected dual Role paths.
 
 
-## 1.9.5-slim23
+## 1.9.5-slim24
 
 - 以 GitHub `main` commit `024c5440690631cd9a11ddaac7cde2e6bcd526ca`
   與版本 `1.9.5-slim17` 作為來源基準。

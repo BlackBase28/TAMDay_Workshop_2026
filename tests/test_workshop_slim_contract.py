@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class WorkshopSlimContractTests(unittest.TestCase):
     def test_version_and_source_base(self):
-        self.assertEqual((ROOT / "VERSION").read_text().strip(), "1.9.5-slim23")
+        self.assertEqual((ROOT / "VERSION").read_text().strip(), "1.9.5-slim24")
         source = (ROOT / "SOURCE_BASE.md").read_text()
         self.assertIn("024c5440690631cd9a11ddaac7cde2e6bcd526ca", source)
         self.assertIn("1.9.5-slim17", source)
@@ -67,9 +67,11 @@ class WorkshopSlimContractTests(unittest.TestCase):
         self.assertIn("hosts: localhost", playbook)
         self.assertIn("connection: local", playbook)
         self.assertIn("ansible.builtin.uri", playbook)
-        self.assertIn('url: "{{ ntfy_url | trim }}"', playbook)
+        self.assertIn('url: "{{ ntfy_server_url_effective }}"', playbook)
+        self.assertIn("body_format: json", playbook)
+        self.assertIn('topic: "{{ ntfy_topic_effective }}"', playbook)
         self.assertIn("method: POST", playbook)
-        self.assertIn('body: "{{ ntfy_message_effective }}"', playbook)
+        self.assertIn('message: "{{ ntfy_message_effective }}"', playbook)
         self.assertIn("workflow_review_summary", playbook)
         self.assertNotIn("roles:", playbook)
         self.assertNotIn("kernel_cve_radar_remediation_action", playbook)
@@ -93,6 +95,17 @@ class WorkshopSlimContractTests(unittest.TestCase):
                         "slack",
                         path.read_text(encoding="utf-8").lower(),
                     )
+
+    def test_ntfy_uses_utf8_safe_json_publish(self):
+        playbook = (ROOT / "playbooks/send_ntfy_alert.yml").read_text()
+        self.assertIn("body_format: json", playbook)
+        self.assertIn('url: "{{ ntfy_server_url_effective }}"', playbook)
+        self.assertIn('topic: "{{ ntfy_topic_effective }}"', playbook)
+        self.assertIn('title: "{{ ntfy_title_effective }}"', playbook)
+        self.assertIn('message: "{{ ntfy_message_effective }}"', playbook)
+        self.assertNotIn("headers:", playbook)
+        self.assertNotIn("Content-Type: text/plain", playbook)
+
 
     def test_all_yaml_files_parse(self):
         for pattern in ("*.yml", "*.yaml"):

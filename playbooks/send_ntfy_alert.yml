@@ -1,5 +1,5 @@
 ---
-- name: Send ntfy workflow notification
+- name: Publish ntfy workflow notification
   hosts: localhost
   connection: local
   gather_facts: false
@@ -15,45 +15,86 @@
             true
           )
       }}
-    ntfy_title_effective: "{{ ntfy_title | default('Kernel CVE Radar', true) }}"
-    ntfy_priority_effective: "{{ ntfy_priority | default('default', true) }}"
-    ntfy_tags_effective: "{{ ntfy_tags | default('warning,robot', true) }}"
-    ntfy_validate_certs_effective: "{{ ntfy_validate_certs | default(true) | bool }}"
-    ntfy_timeout_effective: "{{ ntfy_timeout | default(30) | int }}"
-    ntfy_no_log_effective: "{{ ntfy_no_log | default(true) | bool }}"
+    ntfy_title_effective: >-
+      {{ ntfy_title | default('Kernel CVE Radar', true) }}
+    ntfy_priority_name_effective: >-
+      {{ ntfy_priority | default('default', true) | string | lower }}
+    ntfy_priority_map:
+      min: 1
+      low: 2
+      default: 3
+      high: 4
+      max: 5
+      urgent: 5
+    ntfy_tags_effective: >-
+      {{
+        ntfy_tags
+        | default('warning,robot', true)
+        | string
+        | split(',')
+        | map('trim')
+        | reject('equalto', '')
+        | list
+      }}
+    ntfy_validate_certs_effective: >-
+      {{ ntfy_validate_certs | default(true) | bool }}
+    ntfy_timeout_effective: >-
+      {{ ntfy_timeout | default(30) | int }}
+    ntfy_no_log_effective: >-
+      {{ ntfy_no_log | default(true) | bool }}
 
   tasks:
-    - name: Validate ntfy workflow settings
+    - name: Normalize ntfy topic URL
+      ansible.builtin.set_fact:
+        ntfy_url_normalized: >-
+          {{ ntfy_url | default('', true) | trim | regex_replace('/+$', '') }}
+
+    - name: Validate ntfy workflow variables
       ansible.builtin.assert:
         that:
-          - ntfy_url is defined
-          - ntfy_url | trim | length > 0
+          - ntfy_url_normalized | length > 0
+          - ntfy_url_normalized is match('^https?://[^/]+/.+$')
           - ntfy_message_effective | string | length > 0
+          - ntfy_priority_name_effective in ntfy_priority_map
         fail_msg: >-
-          Set ntfy_url to the complete ntfy topic URL through Job Template or
-          Workflow Extra Variables, for example https://ntfy.sh/my-topic.
+          Set ntfy_url to a complete topic URL such as
+          https://ntfy.sh/tamday-user01-randomstring. ntfy_priority must be one
+          of min, low, default, high, max, or urgent.
+
+    - name: Resolve ntfy server and topic
+      ansible.builtin.set_fact:
+        ntfy_server_url_effective: >-
+          {{ ntfy_url_normalized | regex_replace('/[^/]+$', '/') }}
+        ntfy_topic_effective: >-
+          {{ ntfy_url_normalized | regex_replace('^.*/', '') }}
+        ntfy_priority_effective: >-
+          {{ ntfy_priority_map[ntfy_priority_name_effective] }}
 
     - name: Publish ntfy workflow notification
       ansible.builtin.uri:
-        url: "{{ ntfy_url | trim }}"
+        url: "{{ ntfy_server_url_effective }}"
         method: POST
-        headers:
-          Content-Type: text/plain; charset=utf-8
-          Title: "{{ ntfy_title_effective }}"
-          Priority: "{{ ntfy_priority_effective }}"
-          Tags: "{{ ntfy_tags_effective }}"
-        body: "{{ ntfy_message_effective }}"
-        status_code: [200, 201, 202, 204]
+        body_format: json
+        body:
+          topic: "{{ ntfy_topic_effective }}"
+          message: "{{ ntfy_message_effective }}"
+          title: "{{ ntfy_title_effective }}"
+          priority: "{{ ntfy_priority_effective | int }}"
+          tags: "{{ ntfy_tags_effective }}"
+        status_code:
+          - 200
         return_content: true
         validate_certs: "{{ ntfy_validate_certs_effective }}"
         timeout: "{{ ntfy_timeout_effective }}"
-      register: ntfy_response
+      register: ntfy_publish_result
+      changed_when: true
       no_log: "{{ ntfy_no_log_effective }}"
 
-    - name: Show safe ntfy delivery result
+    - name: Show ntfy publish result
       ansible.builtin.debug:
         msg:
-          notification: ntfy
-          delivered: true
-          status: "{{ ntfy_response.status | default('accepted') }}"
+          topic: "{{ ntfy_topic_effective }}"
           title: "{{ ntfy_title_effective }}"
+          priority: "{{ ntfy_priority_name_effective }}"
+          response_id: "{{ ntfy_publish_result.json.id | default('') }}"
+          status: "{{ ntfy_publish_result.status | default('') }}"
