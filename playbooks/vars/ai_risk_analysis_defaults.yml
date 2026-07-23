@@ -9,7 +9,7 @@ cve_radar_ai_defaults:
   ai_validate_certs: false
   ai_timeout: 180
 
-  rhel_mcp_url: http://192.168.1.110:8000/mcp
+  rhel_mcp_url: ""
   rhel_mcp_validate_certs: false
   rhel_mcp_timeout: 30
   rhel_mcp_sse_read_timeout: 300
@@ -49,3 +49,7 @@ cve_radar_ai_defaults:
   remediation_web_source_variant: solution
   remediation_repair_branch: main
   remediation_repair_commit: ""
+
+  ntfy_validate_certs: true
+  ntfy_timeout: 30
+  ntfy_no_log: true
