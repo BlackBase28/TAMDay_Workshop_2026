@@ -1,0 +1,59 @@
+---
+- name: Send ntfy workflow notification
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+
+  vars:
+    ntfy_message_effective: >-
+      {{
+        ntfy_message
+        | default(
+            workflow_review_summary
+            | default('Kernel CVE Radar workflow notification.', true),
+            true
+          )
+      }}
+    ntfy_title_effective: "{{ ntfy_title | default('Kernel CVE Radar', true) }}"
+    ntfy_priority_effective: "{{ ntfy_priority | default('default', true) }}"
+    ntfy_tags_effective: "{{ ntfy_tags | default('warning,robot', true) }}"
+    ntfy_validate_certs_effective: "{{ ntfy_validate_certs | default(true) | bool }}"
+    ntfy_timeout_effective: "{{ ntfy_timeout | default(30) | int }}"
+    ntfy_no_log_effective: "{{ ntfy_no_log | default(true) | bool }}"
+
+  tasks:
+    - name: Validate ntfy workflow settings
+      ansible.builtin.assert:
+        that:
+          - ntfy_url is defined
+          - ntfy_url | trim | length > 0
+          - ntfy_message_effective | string | length > 0
+        fail_msg: >-
+          Set ntfy_url to the complete ntfy topic URL through Job Template or
+          Workflow Extra Variables, for example https://ntfy.sh/my-topic.
+
+    - name: Publish ntfy workflow notification
+      ansible.builtin.uri:
+        url: "{{ ntfy_url | trim }}"
+        method: POST
+        headers:
+          Content-Type: text/plain; charset=utf-8
+          Title: "{{ ntfy_title_effective }}"
+          Priority: "{{ ntfy_priority_effective }}"
+          Tags: "{{ ntfy_tags_effective }}"
+        body: "{{ ntfy_message_effective }}"
+        status_code: [200, 201, 202, 204]
+        return_content: true
+        validate_certs: "{{ ntfy_validate_certs_effective }}"
+        timeout: "{{ ntfy_timeout_effective }}"
+      register: ntfy_response
+      no_log: "{{ ntfy_no_log_effective }}"
+
+    - name: Show safe ntfy delivery result
+      ansible.builtin.debug:
+        msg:
+          notification: ntfy
+          delivered: true
+          status: "{{ ntfy_response.status | default('accepted') }}"
+          title: "{{ ntfy_title_effective }}"

@@ -22,7 +22,7 @@ from typing import Any, Iterable
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-VERSION = "1.9.5-slim17"
+VERSION = "1.9.5-slim22"
 
 LOGIN_FAILURE_KEY = "kernel-cve-radar.authentication.login.failure"
 LOGIN_SUCCESS_KEY = "kernel-cve-radar.authentication.login.success"

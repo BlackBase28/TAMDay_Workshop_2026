@@ -1,64 +1,18 @@
-# Student lab guide
+# Student Lab Runtime Map
 
-All secrets, Projects, Inventory, Credentials, Job Templates, Event Stream, and the disabled Rulebook Activation are prepared before class.
+學員不需要修改 Repository 內的 Token 或密碼。SSH、AI Model、RHEL MCP 與 Event Stream 秘密均由 AAP Credential 注入。
 
-## 1. Confirm your isolated Organization
+## Lab 1
 
-After signing in to AAP, verify that you can see only your own:
+1. 啟用 Rulebook Activation。
+2. 以 `user1` 登入並存取 `/admin`。
+3. 確認 `CVE Radar - AI Risk Analysis` 啟動。
+4. 在 `CVE Radar - Governed Web Remediation` 完成 Approval。
+5. Workflow 依序執行維護、部署 solution、恢復與驗證。
 
-- CVE Radar Inventory and host
-- Job Templates
-- Workflows
-- Event Stream
-- Rulebook Activation
+## Lab 2
 
-## 2. Complete the governed remediation Workflow
-
-Open `CVE Radar - Governed Web Remediation` and create or complete this path:
-
-```text
-CVE Radar - Enable Maintenance
-→ Approval: Approve governed web remediation
-→ CVE Radar - Deploy Repaired Website
-→ CVE Radar - Verify Fixed Site Before Restore
-→ CVE Radar - Restore Login Page
-→ CVE Radar - Verify Fixed Site
-```
-
-Use success links between the normal steps. Do not connect a failed deployment or failed pre-restore verification directly to Restore Login Page.
-
-## 3. Complete the suspicious-login review Workflow
-
-Open `CVE Radar - Suspicious Login Review` and create or complete:
-
-```text
-CVE Radar - Record Suspicious Login Review
-→ Approval: Review suspicious successful login
-```
-
-This is a review-only flow.
-
-## 4. Enable the Rulebook Activation
-
-Enable `CVE Radar Security Event Activation` and wait until its state is Running.
-
-## 5. Run Lab 1
-
-1. Sign in to CVE Radar as `user1`.
-2. Access `/admin`.
-3. In AAP, open the launched `CVE Radar - AI Risk Analysis` Job.
-4. Review the bounded MCP evidence and the AI proposal.
-5. Open `CVE Radar - Governed Web Remediation`.
-6. Approve the pending Approval node.
-7. Confirm that the solution is deployed and `user1` can no longer access `/admin`.
-
-## 6. Run Lab 2
-
-1. Generate three failed `admin` login attempts followed by one successful login within five minutes.
-2. Review the launched AI Risk Analysis Job.
-3. Confirm that `CVE Radar - Suspicious Login Review` starts only when the governed failure count is at least three.
-4. Review and approve the record-only Workflow.
-
-## 7. Reset the lab
-
-Run `CVE Radar - Reset Lab` only when instructed. It deploys the vulnerable `start` version for the next exercise.
+1. 連續輸入至少三次錯誤 admin 密碼。
+2. 再以正確 admin 密碼登入。
+3. 確認 AI 透過 RHEL MCP 讀取 `/var/log/kernel-cve-radar/auth-events.jsonl`。
+4. 達門檻時檢查 `CVE Radar - Suspicious Login Review` 的調查摘要。

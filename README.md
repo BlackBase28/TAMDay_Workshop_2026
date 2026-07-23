@@ -1,74 +1,125 @@
-# TAM Day – Governed EDA Security Investigation
+# TAM Day CVE Radar Workshop
 
-Git-managed project based on the proven **V1.9.5** runtime baseline.
+Version: `1.9.5-slim22`
 
-## Active labs
+本專案以 GitHub `main` commit
+`024c5440690631cd9a11ddaac7cde2e6bcd526ca`（原版本 `1.9.5-slim17`）為來源基準，
+作為學員在 AAP Automation Execution 與 Automation Decisions 共用的單一 Runtime Project。
 
-| Lab | EDA trigger | AI investigation | Governed hand-off |
-|---|---|---|---|
-| Lab 1 | Non-admin successfully accesses `/admin` | Confirm broken access control | `CVE Radar - Governed Web Remediation` |
-| Lab 2 | Every successful `admin` login | RHEL MCP reads the auth log and counts `admin` login failures in the previous 5 minutes | Start `CVE Radar - Suspicious Login Review` only when failures ≥ 3 |
+只保留兩個 Lab 所需的 AI/EDA、Forwarder、Remediation、驗證元件，以及可加入
+AAP Workflow 的獨立 ntfy 通知 Playbook。
 
-For Lab 2, the successful login is only a wake-up signal. Login failures remain
-in `/var/log/kernel-cve-radar/auth-events.jsonl` and are not individually sent to
-EDA. The Model plans a bounded MCP investigation, while the Adapter restricts it
-to `read_log_file`, `get_journal_logs`, and `get_service_status`. The Auth Log
-read remains mandatory because the Adapter applies the five-minute threshold
-after MCP evidence is collected.
+## Lab 流程
 
-When fewer than three failures are found, the AI Job records `observe` and does
-not publish a Review proposal. The flow never locks the account, blocks an IP,
-enables maintenance mode, or changes the target host.
-
-The Adapter rebuilds the Lab 2 evidence summary from the parsed Auth Log records,
-so a Model-generated count cannot conflict with the governed five-minute count.
-When the Review Workflow is launched, it receives the failure timestamps,
-reasons, source IPs, and a formatted `workflow_review_summary` through
-`extra_vars`.
-
-## Active flow
+### Lab 1：Broken access control
 
 ```text
-admin login succeeds
-→ Forwarder sends admin.login.success
-→ EDA launches CVE Radar - AI Risk Analysis
-→ Model plans bounded MCP evidence collection
-→ Adapter permits only read_log_file/get_journal_logs/get_service_status
-→ Auth Log read counts admin failures during the previous 5 minutes
-├─ failures >= 3 → require_approval → Suspicious Login Review Workflow
-└─ failures < 3  → observe → no Workflow
+user1 存取 /admin
+→ Forwarder 送出事件
+→ EDA 啟動 AI Risk Analysis
+→ AI 透過受控 RHEL MCP 蒐證
+→ EDA 啟動 Governed Web Remediation
+→ 維護頁 → 部署 solution → 恢復網站 → 驗證
 ```
 
-## Runtime entry points
+### Lab 2：Suspicious successful admin login
 
-- AI analysis: `playbooks/eda_ai_risk_analysis.yml`
-- Review record: `playbooks/suspicious_login_review.yml`
-- Git defaults: `playbooks/vars/ai_risk_analysis_defaults.yml`
-- Forwarder deployment: `playbooks/deploy_forwarder.yml`
+```text
+admin 登入成功
+→ Forwarder 喚醒 EDA
+→ AI 檢查前 5 分鐘 Auth Log
+├─ 失敗 >= 3：啟動 Suspicious Login Review
+└─ 失敗 < 3：只記錄 observe
+```
 
-The Forwarder deployment uses the AAP Machine Credential or inventory connection variables for SSH authentication. It does not load host passwords from the Git Project.
-The Forwarder also publishes `cve_radar_collector_hostname` (default: `inventory_hostname`) so AI Analysis uses the inventory/MCP host key instead of a cloud provider internal OS hostname. HTTPD log ACL deployment applies both directory traversal access and inherited defaults, explicitly recalculates masks with the supported `mask` enum, then validates readability as the configured MCP user. The deployment also adds the MCP SSH user to `systemd-journal` and validates `journalctl` access for `get_journal_logs`.
-- Rulebook: `extensions/eda/rulebooks/cve_radar_authentication_anomaly.yml`
+Lab 2 不鎖帳號、不封鎖 IP，也不修改目標主機。
 
-Job Template Extra Variables can remain empty. Tokens remain in AAP Credentials.
-Rulebook Activation Variables can override the Organization, AI Job Template,
-and Workflow names.
+## AAP 執行入口
 
-## Validation
+| 用途 | Playbook |
+|---|---|
+| 部署 Forwarder 與 MCP 讀取權限 | `playbooks/deploy_forwarder.yml` |
+| AI/MCP 調查 | `playbooks/eda_ai_risk_analysis.yml` |
+| 記錄異常登入審查 | `playbooks/suspicious_login_review.yml` |
+| 切換維護頁 | `playbooks/enable_maintenance_page.yml` |
+| 部署修復版本 | `playbooks/sync_solution_from_git_and_deploy.yml` |
+| 恢復正常網站 | `playbooks/restore_login_page.yml` |
+| 驗證修復 | `playbooks/verify_fixed_site.yml` |
+| 重設 vulnerable 版本 | `playbooks/sync_start_from_git_and_deploy.yml` |
+| Workflow ntfy 通知節點 | `playbooks/send_ntfy_alert.yml` |
+| EDA Rulebook | `extensions/eda/rulebooks/cve_radar_authentication_anomaly.yml` |
+
+## Role 路徑
+
+根目錄 `ansible.cfg` 保留 GitHub 主分支已修正的雙 Role Search Path：
+
+```ini
+roles_path = ./roles:./playbooks/roles:/runner/project/roles:/runner/project/playbooks/roles
+```
+
+- Remediation Role：`roles/kernel_cve_radar_remediation`
+- Forwarder Role：`playbooks/roles/cve_radar_eda_forwarder`
+
+## ntfy Workflow 節點
+
+`playbooks/send_ntfy_alert.yml` 是獨立 Playbook：
+
+- 在 `localhost` 執行。
+- 不載入 `kernel_cve_radar_remediation` Role。
+- 不需要目標主機 Machine Credential。
+- 可作為 Workflow 中的通知節點。
+
+必要 Extra Variable：
+
+```yaml
+ntfy_url: "https://ntfy.sh/<topic>"
+```
+
+可選 Extra Variables：
+
+```yaml
+ntfy_message: "Kernel CVE Radar remediation completed."
+ntfy_title: "Kernel CVE Radar"
+ntfy_priority: default
+ntfy_tags: "white_check_mark,robot"
+ntfy_validate_certs: true
+ntfy_timeout: 30
+ntfy_no_log: true
+```
+
+若未提供 `ntfy_message`，Playbook 會優先使用上游 Workflow 節點透過
+`set_stats` 傳入的 `workflow_review_summary`。
+
+## Remediation 動作
+
+Remediation Role 僅保留：
+
+```text
+enable_maintenance
+sync_solution_from_git_and_deploy
+restore_site
+verify_fixed_site
+sync_start_from_git_and_deploy
+```
+
+ntfy 不屬於 Remediation action。
+
+## 已移除
+
+- `playbooks/verify_fixed_site_before_restore.yml`
+- `playbooks/ai_dispatch_remediation.yml`
+- `playbooks/send_slack_alert.yml`
+- `roles/kernel_cve_radar_remediation/tasks/send_slack_alert.yml`
+- `decision-environment/`
+- 根目錄重複的 `requirements.yml`
+
+Custom AI EE 繼續使用既有的 `CVE Radar AI EE 1.8.2`；不在學員 Runtime
+Project 內重建。
+
+## 驗證
 
 ```bash
 ./tests/verify_project.sh
-
-# Direct Event Stream smoke tests
-./tests/send_test_event.sh admin-access user1 192.168.1.104 /admin
-./tests/send_test_event.sh admin-login-success 192.168.1.104
-
-# End-to-end Lab 2 test through the Forwarder
-sudo ./tests/send_test_event.sh append-login-sequence \
-  192.168.1.104 3 \
-  /var/log/kernel-cve-radar/auth-events.jsonl
 ```
 
-Setup details are in `docs/SETUP.md`.
-
-- Journal permission verification uses `setpriv --init-groups` so an existing AAP SSH session does not cause a false failure immediately after group membership changes.
+來源版本資訊請見 `SOURCE_BASE.md`。

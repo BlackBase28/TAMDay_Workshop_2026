@@ -251,3 +251,58 @@ setpriv --reuid=lab-user --regid="$(id -g lab-user)" --init-groups \
 
 This creates a fresh process credential set from the current user/group database.
 RHEL MCP itself must still create a new SSH connection after the deployment.
+
+
+## Remediation Role discovery
+
+The Project keeps two role roots. Do not move or duplicate the roles:
+
+```text
+roles/kernel_cve_radar_remediation
+playbooks/roles/cve_radar_eda_forwarder
+```
+
+The repository root `ansible.cfg` must remain present so AAP Runner searches both locations.
+
+## External Execution Environment
+
+`CVE Radar - AI Risk Analysis` uses the prebuilt `CVE Radar AI EE 1.8.2` object.
+The student Runtime Project intentionally does not carry Image build definitions.
+
+## Optional ntfy Workflow node
+
+Create a standalone Job Template using `playbooks/send_ntfy_alert.yml`.
+
+Recommended Job Template settings:
+
+```text
+Name: CVE Radar - Send ntfy Alert
+Playbook: playbooks/send_ntfy_alert.yml
+Execution Environment: Default execution environment
+Inventory: localhost-compatible inventory
+Credentials: no target-host Machine Credential required
+Variables: Prompt on launch enabled
+```
+
+Required Workflow or Job Template Extra Variable:
+
+```yaml
+ntfy_url: "https://ntfy.sh/<topic>"
+```
+
+Optional variables:
+
+```yaml
+ntfy_message: "Kernel CVE Radar remediation completed."
+ntfy_title: "Kernel CVE Radar"
+ntfy_priority: default
+ntfy_tags: "white_check_mark,robot"
+ntfy_validate_certs: true
+ntfy_timeout: 30
+ntfy_no_log: true
+```
+
+When `ntfy_message` is omitted, the Playbook uses `workflow_review_summary`
+from an upstream Workflow node when available. The ntfy Playbook runs on
+`localhost` and does not load the Remediation Role.
+

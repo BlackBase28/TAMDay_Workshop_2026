@@ -10,7 +10,7 @@ kernel_cve_radar_solution_dir: "{{ kernel_cve_radar_source_dir }}/kernel-CVE-rad
 
 # Optional remote application repo.
 # When empty, sync_start/sync_solution playbooks use the existing local folder
-# on the target VM: /opt/cve-radar/src/start or /opt/cve-radar/src/solution.
+# on the target VM, using the paths defined above.
 kernel_cve_radar_repo_url: ""
 kernel_cve_radar_repo_version: main
 kernel_cve_radar_solution_sync_remote_folder: solution

@@ -227,7 +227,7 @@ class ProjectContractTests(unittest.TestCase):
         self.assertIn('cve_radar_collector_hostname: "{{ inventory_hostname }}"', defaults)
         self.assertIn('COLLECTOR_HOSTNAME={{ cve_radar_collector_hostname | trim | quote }}', env_template)
         self.assertIn('${COLLECTOR_HOSTNAME:-$(hostname -f', helper)
-        self.assertIn('VERSION = "1.9.5-slim17"', self.forwarder_text)
+        self.assertIn('VERSION = "1.9.5-slim22"', self.forwarder_text)
 
 
     def test_acl_mask_recalculation_uses_supported_enum(self):

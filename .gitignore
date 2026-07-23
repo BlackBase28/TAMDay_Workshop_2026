@@ -1,9 +1,5 @@
-*.retry
+__pycache__/
+*.py[cod]
 *.log
 .env
-secrets.yml
-.vault_pass
-*.vault_pass
-*.pyc
-__pycache__/
-decision-environment/context/
+.venv/
