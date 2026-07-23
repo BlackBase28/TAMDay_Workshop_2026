@@ -1,0 +1,7 @@
+{
+  "topic": {{ ntfy_topic_effective | string | ansible.builtin.to_json(ensure_ascii=true) }},
+  "message": {{ ntfy_message_effective | string | ansible.builtin.to_json(ensure_ascii=true) }},
+  "title": {{ ntfy_title_effective | string | ansible.builtin.to_json(ensure_ascii=true) }},
+  "priority": {{ ntfy_priority_effective | int }},
+  "tags": {{ ntfy_tags_effective | ansible.builtin.to_json(ensure_ascii=true) }}
+}

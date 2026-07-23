@@ -1,6 +1,20 @@
 # Changelog
 
-## 1.9.5-slim25
+## 1.9.5-slim26
+
+- Fix Ansible Native Jinja converting `ntfy_payload_json` back into a dict,
+  which caused `from_json` to fail with `the JSON object must be str, bytes or
+  bytearray, not dict`.
+- Render the ntfy JSON payload into a temporary file using
+  `playbooks/templates/ntfy_payload.json.j2`.
+- Validate the actual rendered file with `slurp` and `from_json`.
+- Upload the validated file through `ansible.builtin.uri` `src`.
+- Remove the temporary payload file through an `always` block.
+- Preserve the existing Job Template Extra Variables and UTF-8-safe JSON
+  fields.
+
+
+## 1.9.5-slim26
 
 - Fix ntfy HTTP 400 `request body must be valid JSON` errors.
 - Stop relying on `ansible.builtin.uri` implicit `body_format: json`
@@ -14,7 +28,7 @@
   support from slim24.
 
 
-## 1.9.5-slim25
+## 1.9.5-slim26
 
 - Fix ntfy failures when Traditional Chinese titles are encoded as HTTP
   headers (`'latin-1' codec can't encode characters`).
@@ -27,7 +41,7 @@
 - Preserve slim23 explicit AI Model selection and raw response comparison.
 
 
-## 1.9.5-slim25
+## 1.9.5-slim26
 
 - Remove the Project defaults for `ai_model_url` and `ai_model`; both must be
   selected explicitly by the AI Analysis Job Template or launch.
@@ -41,7 +55,7 @@
   governed MCP controls, and corrected dual Role paths.
 
 
-## 1.9.5-slim25
+## 1.9.5-slim26
 
 - 以 GitHub `main` commit `024c5440690631cd9a11ddaac7cde2e6bcd526ca`
   與版本 `1.9.5-slim17` 作為來源基準。

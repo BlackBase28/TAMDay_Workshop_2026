@@ -46,12 +46,13 @@ python3 -m unittest discover -s "$root/tests" -p 'test_*.py' -v
 grep -Eq '^  ai_model_url: ""$' "$root/playbooks/vars/ai_risk_analysis_defaults.yml"
 grep -Eq '^  ai_model: ""$' "$root/playbooks/vars/ai_risk_analysis_defaults.yml"
 grep -q "Show raw Model responses for comparison" "$root/playbooks/eda_ai_risk_analysis.yml"
-grep -q "body_format: raw" "$root/playbooks/send_ntfy_alert.yml"
-grep -q "ansible.builtin.to_json" "$root/playbooks/send_ntfy_alert.yml"
+grep -q "ansible.builtin.template" "$root/playbooks/send_ntfy_alert.yml"
+grep -q 'src: "{{ ntfy_payload_tempfile.path }}"' "$root/playbooks/send_ntfy_alert.yml"
 grep -q "Content-Type: application/json" "$root/playbooks/send_ntfy_alert.yml"
+test -f "$root/playbooks/templates/ntfy_payload.json.j2"
 ! grep -q "qwen3-14b" "$root/playbooks/files/governed_agentic_adapter.py"
 
 find "$root" -type d -name __pycache__ -prune -exec rm -rf {} +
 find "$root" -type f -name '*.pyc' -delete
 
-echo "OK: Workshop 1.9.5-slim25 GitHub-based slim runtime with standalone ntfy"
+echo "OK: Workshop 1.9.5-slim26 GitHub-based slim runtime with standalone ntfy"

@@ -381,3 +381,20 @@ It validates the resulting string with `from_json`, then sends it using
 This avoids implicit `uri` JSON conversion differences between Execution
 Environment / ansible-core versions and safely escapes Traditional Chinese
 characters.
+
+
+## ntfy payload file rendering
+
+The ntfy Workflow Playbook renders the JSON payload through
+`playbooks/templates/ntfy_payload.json.j2` into a temporary file, validates the
+file with `slurp` plus `from_json`, and uploads the file through the `uri`
+module's `src` parameter.
+
+This avoids Ansible Native Jinja converting a JSON string back into a dict
+inside `set_fact`, which caused errors such as:
+
+```text
+the JSON object must be str, bytes or bytearray, not dict
+```
+
+The temporary file is removed in an `always` block.

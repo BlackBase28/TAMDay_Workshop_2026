@@ -70,53 +70,74 @@
         ntfy_priority_effective: >-
           {{ ntfy_priority_map[ntfy_priority_name_effective] }}
 
-    - name: Build ntfy JSON payload
-      ansible.builtin.set_fact:
-        ntfy_payload:
-          topic: "{{ ntfy_topic_effective }}"
-          message: "{{ ntfy_message_effective | string }}"
-          title: "{{ ntfy_title_effective | string }}"
-          priority: "{{ ntfy_priority_effective | int }}"
-          tags: "{{ ntfy_tags_effective }}"
+    - name: Create temporary ntfy payload file
+      ansible.builtin.tempfile:
+        state: file
+        suffix: .json
+      register: ntfy_payload_tempfile
 
-    - name: Serialize ntfy payload explicitly
-      ansible.builtin.set_fact:
-        ntfy_payload_json: >-
-          {{
-            ntfy_payload
-            | ansible.builtin.to_json(
-                ensure_ascii=true,
-                preprocess_unsafe=false
-              )
-          }}
-      no_log: "{{ ntfy_no_log_effective }}"
+    - name: Render, validate, and publish ntfy payload
+      block:
+        - name: Render ntfy payload as JSON file
+          ansible.builtin.template:
+            src: templates/ntfy_payload.json.j2
+            dest: "{{ ntfy_payload_tempfile.path }}"
+            mode: "0600"
+          no_log: "{{ ntfy_no_log_effective }}"
 
-    - name: Validate serialized ntfy JSON locally
-      ansible.builtin.assert:
-        that:
-          - (ntfy_payload_json | ansible.builtin.from_json).topic == ntfy_topic_effective
-          - (ntfy_payload_json | ansible.builtin.from_json).message | length > 0
-          - (ntfy_payload_json | ansible.builtin.from_json).title | length > 0
-        fail_msg: >-
-          The ntfy payload could not be serialized as valid JSON.
-      no_log: "{{ ntfy_no_log_effective }}"
+        - name: Read rendered ntfy payload
+          ansible.builtin.slurp:
+            src: "{{ ntfy_payload_tempfile.path }}"
+          register: ntfy_payload_file
+          no_log: "{{ ntfy_no_log_effective }}"
 
-    - name: Publish ntfy workflow notification
-      ansible.builtin.uri:
-        url: "{{ ntfy_server_url_effective }}"
-        method: POST
-        body_format: raw
-        headers:
-          Content-Type: application/json
-        body: "{{ ntfy_payload_json }}"
-        status_code:
-          - 200
-        return_content: true
-        validate_certs: "{{ ntfy_validate_certs_effective }}"
-        timeout: "{{ ntfy_timeout_effective }}"
-      register: ntfy_publish_result
-      changed_when: true
-      no_log: "{{ ntfy_no_log_effective }}"
+        - name: Validate rendered ntfy JSON locally
+          ansible.builtin.assert:
+            that:
+              - >-
+                (
+                  ntfy_payload_file.content
+                  | b64decode
+                  | ansible.builtin.from_json
+                ).topic == ntfy_topic_effective
+              - >-
+                (
+                  ntfy_payload_file.content
+                  | b64decode
+                  | ansible.builtin.from_json
+                ).message | length > 0
+              - >-
+                (
+                  ntfy_payload_file.content
+                  | b64decode
+                  | ansible.builtin.from_json
+                ).title | length > 0
+            fail_msg: >-
+              The rendered ntfy payload is not valid JSON.
+          no_log: "{{ ntfy_no_log_effective }}"
+
+        - name: Publish ntfy workflow notification
+          ansible.builtin.uri:
+            url: "{{ ntfy_server_url_effective }}"
+            method: POST
+            src: "{{ ntfy_payload_tempfile.path }}"
+            headers:
+              Content-Type: application/json
+            status_code:
+              - 200
+            return_content: true
+            validate_certs: "{{ ntfy_validate_certs_effective }}"
+            timeout: "{{ ntfy_timeout_effective }}"
+          register: ntfy_publish_result
+          changed_when: true
+          no_log: "{{ ntfy_no_log_effective }}"
+
+      always:
+        - name: Remove temporary ntfy payload file
+          ansible.builtin.file:
+            path: "{{ ntfy_payload_tempfile.path }}"
+            state: absent
+          no_log: "{{ ntfy_no_log_effective }}"
 
     - name: Show ntfy publish result
       ansible.builtin.debug:

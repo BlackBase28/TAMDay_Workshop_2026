@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class WorkshopSlimContractTests(unittest.TestCase):
     def test_version_and_source_base(self):
-        self.assertEqual((ROOT / "VERSION").read_text().strip(), "1.9.5-slim25")
+        self.assertEqual((ROOT / "VERSION").read_text().strip(), "1.9.5-slim26")
         source = (ROOT / "SOURCE_BASE.md").read_text()
         self.assertIn("024c5440690631cd9a11ddaac7cde2e6bcd526ca", source)
         self.assertIn("1.9.5-slim17", source)
@@ -61,6 +61,7 @@ class WorkshopSlimContractTests(unittest.TestCase):
 
     def test_ntfy_is_standalone_workflow_playbook(self):
         playbook = (ROOT / "playbooks/send_ntfy_alert.yml").read_text()
+        template = (ROOT / "playbooks/templates/ntfy_payload.json.j2").read_text()
         defaults = (
             ROOT / "roles/kernel_cve_radar_remediation/defaults/main.yml"
         ).read_text()
@@ -68,12 +69,10 @@ class WorkshopSlimContractTests(unittest.TestCase):
         self.assertIn("connection: local", playbook)
         self.assertIn("ansible.builtin.uri", playbook)
         self.assertIn('url: "{{ ntfy_server_url_effective }}"', playbook)
-        self.assertIn("body_format: raw", playbook)
-        self.assertIn("ansible.builtin.to_json", playbook)
-        self.assertIn('topic: "{{ ntfy_topic_effective }}"', playbook)
+        self.assertIn('src: "{{ ntfy_payload_tempfile.path }}"', playbook)
         self.assertIn("method: POST", playbook)
-        self.assertIn('message: "{{ ntfy_message_effective | string }}"', playbook)
         self.assertIn("workflow_review_summary", playbook)
+        self.assertIn('"message": {{ ntfy_message_effective', template)
         self.assertNotIn("roles:", playbook)
         self.assertNotIn("kernel_cve_radar_remediation_action", playbook)
         self.assertNotIn("ntfy", defaults.lower())
@@ -97,21 +96,23 @@ class WorkshopSlimContractTests(unittest.TestCase):
                         path.read_text(encoding="utf-8").lower(),
                     )
 
-    def test_ntfy_uses_utf8_safe_json_publish(self):
+    def test_ntfy_uses_rendered_json_file(self):
         playbook = (ROOT / "playbooks/send_ntfy_alert.yml").read_text()
-        self.assertIn("body_format: raw", playbook)
-        self.assertIn("ansible.builtin.to_json", playbook)
-        self.assertIn('url: "{{ ntfy_server_url_effective }}"', playbook)
-        self.assertIn("Build ntfy JSON payload", playbook)
-        self.assertIn('topic: "{{ ntfy_topic_effective }}"', playbook)
-        self.assertIn('title: "{{ ntfy_title_effective | string }}"', playbook)
-        self.assertIn('message: "{{ ntfy_message_effective | string }}"', playbook)
-        self.assertIn("Validate serialized ntfy JSON locally", playbook)
-        self.assertIn('body: "{{ ntfy_payload_json }}"', playbook)
-        self.assertIn("headers:", playbook)
+        template = (ROOT / "playbooks/templates/ntfy_payload.json.j2").read_text()
+        self.assertIn("ansible.builtin.tempfile", playbook)
+        self.assertIn("ansible.builtin.template", playbook)
+        self.assertIn("templates/ntfy_payload.json.j2", playbook)
+        self.assertIn("ansible.builtin.slurp", playbook)
+        self.assertIn("ansible.builtin.from_json", playbook)
+        self.assertIn('src: "{{ ntfy_payload_tempfile.path }}"', playbook)
         self.assertIn("Content-Type: application/json", playbook)
-        self.assertNotIn("Content-Type: text/plain", playbook)
-
+        self.assertIn("always:", playbook)
+        self.assertIn("Remove temporary ntfy payload file", playbook)
+        self.assertNotIn("ntfy_payload_json:", playbook)
+        self.assertIn("ensure_ascii=true", template)
+        self.assertIn('"topic":', template)
+        self.assertIn('"message":', template)
+        self.assertIn('"title":', template)
 
     def test_all_yaml_files_parse(self):
         for pattern in ("*.yml", "*.yaml"):
