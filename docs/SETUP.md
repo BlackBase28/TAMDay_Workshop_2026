@@ -363,3 +363,21 @@ ntfy_tags: "white_check_mark,robot"
 
 Supported priority names are `min`, `low`, `default`, `high`, `max`, and
 `urgent`.
+
+
+## ntfy explicit JSON serialization
+
+The Workflow Playbook explicitly serializes the payload with:
+
+```yaml
+ntfy_payload | ansible.builtin.to_json(
+  ensure_ascii=true,
+  preprocess_unsafe=false
+)
+```
+
+It validates the resulting string with `from_json`, then sends it using
+`body_format: raw` and the ASCII-only `Content-Type: application/json` header.
+This avoids implicit `uri` JSON conversion differences between Execution
+Environment / ansible-core versions and safely escapes Traditional Chinese
+characters.

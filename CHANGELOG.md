@@ -1,6 +1,20 @@
 # Changelog
 
-## 1.9.5-slim24
+## 1.9.5-slim25
+
+- Fix ntfy HTTP 400 `request body must be valid JSON` errors.
+- Stop relying on `ansible.builtin.uri` implicit `body_format: json`
+  serialization.
+- Build a structured payload, explicitly serialize it with
+  `ansible.builtin.to_json(ensure_ascii=true, preprocess_unsafe=false)`, and
+  validate it locally with `from_json`.
+- Send the serialized JSON with `body_format: raw` and an ASCII-only
+  `Content-Type: application/json` header.
+- Preserve the complete `ntfy_url` Extra Variable and UTF-8 title/message
+  support from slim24.
+
+
+## 1.9.5-slim25
 
 - Fix ntfy failures when Traditional Chinese titles are encoded as HTTP
   headers (`'latin-1' codec can't encode characters`).
@@ -13,7 +27,7 @@
 - Preserve slim23 explicit AI Model selection and raw response comparison.
 
 
-## 1.9.5-slim24
+## 1.9.5-slim25
 
 - Remove the Project defaults for `ai_model_url` and `ai_model`; both must be
   selected explicitly by the AI Analysis Job Template or launch.
@@ -27,7 +41,7 @@
   governed MCP controls, and corrected dual Role paths.
 
 
-## 1.9.5-slim24
+## 1.9.5-slim25
 
 - 以 GitHub `main` commit `024c5440690631cd9a11ddaac7cde2e6bcd526ca`
   與版本 `1.9.5-slim17` 作為來源基準。
