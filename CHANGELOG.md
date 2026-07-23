@@ -1,6 +1,20 @@
 # Changelog
 
-## 1.9.5-slim22
+## 1.9.5-slim23
+
+- Remove the Project defaults for `ai_model_url` and `ai_model`; both must be
+  selected explicitly by the AI Analysis Job Template or launch.
+- Add `ai_show_model_responses` with a default of `true`.
+- Add the dedicated `Show raw Model responses for comparison` Job Output task.
+- Display planner/final raw provider responses with requested/provider model,
+  rounds, content, provider-exposed reasoning content, tool calls, finish
+  reason, usage, and raw response data.
+- Publish the explicitly selected Model ID as `cve_radar_ai_model`.
+- Preserve the slim22 GitHub baseline, standalone ntfy Workflow Playbook,
+  governed MCP controls, and corrected dual Role paths.
+
+
+## 1.9.5-slim23
 
 - 以 GitHub `main` commit `024c5440690631cd9a11ddaac7cde2e6bcd526ca`
   與版本 `1.9.5-slim17` 作為來源基準。

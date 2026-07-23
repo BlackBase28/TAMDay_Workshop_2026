@@ -43,7 +43,12 @@ python3 -m py_compile \
 
 python3 -m unittest discover -s "$root/tests" -p 'test_*.py' -v
 
+grep -Eq '^  ai_model_url: ""$' "$root/playbooks/vars/ai_risk_analysis_defaults.yml"
+grep -Eq '^  ai_model: ""$' "$root/playbooks/vars/ai_risk_analysis_defaults.yml"
+grep -q "Show raw Model responses for comparison" "$root/playbooks/eda_ai_risk_analysis.yml"
+! grep -q "qwen3-14b" "$root/playbooks/files/governed_agentic_adapter.py"
+
 find "$root" -type d -name __pycache__ -prune -exec rm -rf {} +
 find "$root" -type f -name '*.pyc' -delete
 
-echo "OK: Workshop 1.9.5-slim22 GitHub-based slim runtime with standalone ntfy"
+echo "OK: Workshop 1.9.5-slim23 GitHub-based slim runtime with standalone ntfy"

@@ -2,8 +2,10 @@
 # Non-sensitive defaults for CVE Radar - AI Risk Analysis.
 # Job Template Extra Variables can override any key with the same unprefixed name.
 cve_radar_ai_defaults:
-  ai_model_url: https://maas-rhdp.apps.maas.redhatworkshops.io/v1/chat/completions
-  ai_model: qwen3-14b
+  # Intentionally empty: each AI Analysis Job Template or launch must select
+  # the endpoint and model explicitly, allowing clean 4B/30B comparisons.
+  ai_model_url: ""
+  ai_model: ""
   ai_validate_certs: false
   ai_timeout: 180
 
@@ -35,6 +37,7 @@ cve_radar_ai_defaults:
   ai_debug_trace: true
   ai_debug_trace_include_mcp_results: true
   ai_debug_trace_max_chars: 50000
+  ai_show_model_responses: true
 
   ai_decision_event_enabled: true
   ai_decision_event_dry_run: false

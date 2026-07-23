@@ -1,13 +1,18 @@
 ---
-# All non-sensitive runtime defaults are loaded from:
-# playbooks/vars/ai_risk_analysis_defaults.yml
+# AI_MODEL_URL and AI_MODEL are intentionally not defaulted by the Project.
+# Set both values explicitly in the AI Analysis Job Template, Survey, or launch.
 #
-# Keep Job Template Extra Variables empty unless this template needs an override.
-# Example overrides:
+# Example:
+# ai_model_url: https://<litellm-or-model-gateway>/v1/chat/completions
+# ai_model: <exact-4B-or-30B-model-id>
+#
+# The Model credential injects AI_RISK_WEBHOOK_TOKEN.
+# Keep ai_show_model_responses enabled to compare Model planner/final responses.
+#
+# Optional overrides:
+# ai_show_model_responses: true
+# ai_debug_trace: true
 # rhel_mcp_url: http://another-rhel-mcp.example:8000/mcp
-# ai_model: qwen3-14b
-# ai_debug_trace: false
 # governed_max_investigation_rounds: 2
 # governed_allowed_mcp_tools: read_log_file,get_journal_logs,get_service_status
-# remediation_repair_branch: workshop-main
 {}

@@ -7,6 +7,7 @@ from jinja2 import Environment, StrictUndefined
 
 ROOT = Path(__file__).resolve().parents[1]
 AI = ROOT / "playbooks/eda_ai_risk_analysis.yml"
+ADAPTER = ROOT / "playbooks/files/governed_agentic_adapter.py"
 DEFAULTS = ROOT / "playbooks/vars/ai_risk_analysis_defaults.yml"
 RULEBOOK = ROOT / "extensions/eda/rulebooks/cve_radar_authentication_anomaly.yml"
 FORWARDER = ROOT / "playbooks/roles/cve_radar_eda_forwarder/files/cve_radar_event_forwarder.py"
@@ -19,6 +20,7 @@ class ProjectContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.ai_text = AI.read_text(encoding="utf-8")
+        cls.adapter_text = ADAPTER.read_text(encoding="utf-8")
         cls.ai_data = yaml.safe_load(cls.ai_text)
         cls.defaults_data = yaml.safe_load(DEFAULTS.read_text(encoding="utf-8"))
         cls.defaults = cls.defaults_data["cve_radar_ai_defaults"]
@@ -28,7 +30,8 @@ class ProjectContractTests(unittest.TestCase):
         cls.review_text = REVIEW.read_text(encoding="utf-8")
 
     def test_git_default_file_contract(self) -> None:
-        self.assertEqual(self.defaults["ai_model"], "qwen3-14b")
+        self.assertEqual(self.defaults["ai_model_url"], "")
+        self.assertEqual(self.defaults["ai_model"], "")
         self.assertEqual(self.defaults["rhel_mcp_url"], "http://192.168.1.110:8000/mcp")
         self.assertFalse(self.defaults["ai_validate_certs"])
         self.assertFalse(self.defaults["rhel_mcp_validate_certs"])
@@ -41,6 +44,7 @@ class ProjectContractTests(unittest.TestCase):
         self.assertEqual(self.defaults["governed_error_log_tail_lines"], 30)
         self.assertEqual(self.defaults["governed_max_evidence_chars"], 12000)
         self.assertEqual(self.defaults["ai_model_max_retries"], 1)
+        self.assertTrue(self.defaults["ai_show_model_responses"])
         self.assertTrue(self.defaults["ai_decision_event_enabled"])
         self.assertFalse(self.defaults["ai_decision_event_dry_run"])
         self.assertEqual(self.defaults["ai_decision_event_auth_header"], "X-CVE-Radar-Token")
@@ -66,6 +70,35 @@ class ProjectContractTests(unittest.TestCase):
         rule_name = env.from_string("{{ cve_radar_ai_job_template_name | default('CVE Radar - AI Risk Analysis') }}")
         self.assertEqual(rule_name.render(), "CVE Radar - AI Risk Analysis")
         self.assertEqual(rule_name.render(cve_radar_ai_job_template_name="Lab AI Analysis"), "Lab AI Analysis")
+
+    def test_model_selection_is_explicit_and_required(self) -> None:
+        self.assertIn("- ai_model_url_effective | trim | length > 0", self.ai_text)
+        self.assertIn("- ai_model_effective | trim | length > 0", self.ai_text)
+        self.assertIn(
+            "Set both\n          ai_model_url and ai_model explicitly",
+            self.ai_text,
+        )
+        self.assertIn('os.getenv("AI_MODEL_URL", "")', self.adapter_text)
+        self.assertIn('os.getenv("AI_MODEL", "")', self.adapter_text)
+        self.assertIn('"AI_MODEL is not configured"', self.adapter_text)
+        self.assertNotIn("qwen3-14b", self.adapter_text)
+
+    def test_raw_model_response_comparison_output(self) -> None:
+        for marker in (
+            "ai_show_model_responses_effective",
+            "ai_trace_capture_enabled_effective",
+            "Collect raw Model response trace records",
+            "Show raw Model responses for comparison",
+            "model_plan_output",
+            "model_final_output",
+            "requested_model:",
+            "provider_model:",
+            "reasoning_content:",
+            "tool_calls:",
+            "raw_response:",
+            'cve_radar_ai_model: "{{ ai_model_effective }}"',
+        ):
+            self.assertIn(marker, self.ai_text)
 
     def test_model_credential_contract(self) -> None:
         self.assertIn("lookup('ansible.builtin.env', 'AI_RISK_WEBHOOK_TOKEN')", self.ai_text)
@@ -227,7 +260,7 @@ class ProjectContractTests(unittest.TestCase):
         self.assertIn('cve_radar_collector_hostname: "{{ inventory_hostname }}"', defaults)
         self.assertIn('COLLECTOR_HOSTNAME={{ cve_radar_collector_hostname | trim | quote }}', env_template)
         self.assertIn('${COLLECTOR_HOSTNAME:-$(hostname -f', helper)
-        self.assertIn('VERSION = "1.9.5-slim22"', self.forwarder_text)
+        self.assertIn('VERSION = "1.9.5-slim23"', self.forwarder_text)
 
 
     def test_acl_mask_recalculation_uses_supported_enum(self):

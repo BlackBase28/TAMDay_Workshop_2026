@@ -1182,10 +1182,16 @@ async def call_model(
 ) -> dict[str, Any]:
     url = os.getenv("AI_MODEL_URL", "").strip()
     token = os.getenv("AI_API_TOKEN", "").strip()
-    model = os.getenv("AI_MODEL", "qwen3-14b").strip()
+    model = os.getenv("AI_MODEL", "").strip()
     if not url:
         raise ModelInvocationError(
             "AI_MODEL_URL is not configured",
+            stage=trace_stage,
+            category="configuration_error",
+        )
+    if not model:
+        raise ModelInvocationError(
+            "AI_MODEL is not configured",
             stage=trace_stage,
             category="configuration_error",
         )

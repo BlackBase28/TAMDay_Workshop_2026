@@ -1,6 +1,6 @@
 # TAM Day CVE Radar Workshop
 
-Version: `1.9.5-slim22`
+Version: `1.9.5-slim23`
 
 本專案以 GitHub `main` commit
 `024c5440690631cd9a11ddaac7cde2e6bcd526ca`（原版本 `1.9.5-slim17`）為來源基準，
@@ -123,3 +123,12 @@ Project 內重建。
 ```
 
 來源版本資訊請見 `SOURCE_BASE.md`。
+
+
+## Model selection and comparison
+
+`ai_model_url` and `ai_model` have no Project defaults. The AI Analysis Job
+Template must set both values explicitly. The default
+`ai_show_model_responses: true` adds a dedicated Job Output task that displays
+the raw planner and final Model responses, including content, provider-exposed
+reasoning content, tool calls, finish reason, usage, and provider model ID.

@@ -306,3 +306,42 @@ When `ntfy_message` is omitted, the Playbook uses `workflow_review_summary`
 from an upstream Workflow node when available. The ntfy Playbook runs on
 `localhost` and does not load the Remediation Role.
 
+
+
+## Explicit Model selection and response comparison
+
+The Project intentionally leaves these defaults empty:
+
+```yaml
+ai_model_url: ""
+ai_model: ""
+```
+
+Set both values in `CVE Radar - AI Risk Analysis` through Job Template Extra
+Variables, Survey values, or launch Extra Variables:
+
+```yaml
+ai_model_url: "https://<model-gateway>/v1/chat/completions"
+ai_model: "<exact-model-id>"
+ai_show_model_responses: true
+```
+
+The Job fails before contacting the Model when either `ai_model_url` or
+`ai_model` is empty.
+
+With `ai_show_model_responses: true`, the Job includes a dedicated task named
+`Show raw Model responses for comparison`. Each planner and final response
+shows:
+
+- requested Model ID
+- provider-returned Model ID
+- investigation round and attempt
+- HTTP status and finish reason
+- provider-exposed `reasoning_content`
+- response `content`
+- requested tool calls
+- token usage
+- complete raw provider response
+
+This makes the behavior difference between the selected 4B and 30B models
+visible without changing the Playbook or Execution Environment.

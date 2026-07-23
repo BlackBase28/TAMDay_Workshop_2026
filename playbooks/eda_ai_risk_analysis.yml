@@ -73,6 +73,11 @@
     ai_debug_trace_include_mcp_results_effective: >-
       {{ ai_debug_trace_include_mcp_results | default(cve_radar_ai_defaults.ai_debug_trace_include_mcp_results) | bool }}
 
+    ai_show_model_responses_effective: >-
+      {{ ai_show_model_responses | default(cve_radar_ai_defaults.ai_show_model_responses) | bool }}
+    ai_trace_capture_enabled_effective: >-
+      {{ (ai_debug_trace_effective | bool) or (ai_show_model_responses_effective | bool) }}
+
     ai_decision_event_enabled_effective: >-
       {{ ai_decision_event_enabled | default(cve_radar_ai_defaults.ai_decision_event_enabled) | bool }}
     ai_decision_event_dry_run_effective: >-
@@ -131,15 +136,17 @@
       ansible.builtin.assert:
         that:
           - ai_backend_mode | default('governed_adapter') == 'governed_adapter'
-          - ai_model_url_effective | length > 0
+          - ai_model_url_effective | trim | length > 0
+          - ai_model_effective | trim | length > 0
           - rhel_mcp_url_effective | length > 0
           - ai_api_token_effective | length > 0
           - ai_timeout_effective | int >= 30
           - rhel_mcp_timeout_effective | int >= 5
         fail_msg: >-
-          This project supports ai_backend_mode=governed_adapter only. Attach the
-          Model credential that injects AI_RISK_WEBHOOK_URL,
-          AI_RISK_WEBHOOK_TOKEN, and AI_VALIDATE_CERTS, and configure rhel_mcp_url.
+          This project supports ai_backend_mode=governed_adapter only. Set both
+          ai_model_url and ai_model explicitly in the AI Analysis Job Template,
+          Survey, or launch Extra Variables. Attach the Model credential that
+          injects AI_RISK_WEBHOOK_TOKEN, and configure rhel_mcp_url.
 
     - name: Show safe governed adapter settings
       ansible.builtin.debug:
@@ -264,7 +271,7 @@
         suffix: .jsonl
       register: governed_trace_file
       when:
-        - ai_debug_trace_effective | bool
+        - ai_trace_capture_enabled_effective | bool
     - name: Run governed adapter inside the AAP Custom EE
       ansible.builtin.command:
         argv:
@@ -302,12 +309,19 @@
         GOVERNED_MAX_EVIDENCE_CHARS: "{{ governed_max_evidence_chars_effective }}"
         GOVERNED_MODEL_CAN_OVERRIDE_LINES: >-
           {{ governed_model_can_override_lines_effective | string | lower }}
-        GOVERNED_DEBUG_TRACE: "{{ ai_debug_trace_effective | string | lower }}"
+        GOVERNED_DEBUG_TRACE: "{{ ai_trace_capture_enabled_effective | string | lower }}"
         GOVERNED_TRACE_FILE: >-
           {{ governed_trace_file.path if (governed_trace_file is defined) else '' }}
         GOVERNED_TRACE_MAX_CHARS: "{{ ai_debug_trace_max_chars_effective }}"
         GOVERNED_TRACE_INCLUDE_MCP_RESULTS: >-
-          {{ ai_debug_trace_include_mcp_results_effective | string | lower }}
+          {{
+            (
+              ai_debug_trace_effective
+              and ai_debug_trace_include_mcp_results_effective
+            )
+            | string
+            | lower
+          }}
       register: governed_adapter_result
       changed_when: false
       no_log: true
@@ -317,7 +331,7 @@
       register: governed_trace_file_content
       no_log: true
       when:
-        - ai_debug_trace_effective | bool
+        - ai_trace_capture_enabled_effective | bool
         - governed_trace_file is defined
     - name: Decode governed AI and MCP trace lines
       ansible.builtin.set_fact:
@@ -330,7 +344,7 @@
         governed_trace_records: []
       no_log: true
       when:
-        - ai_debug_trace_effective | bool
+        - ai_trace_capture_enabled_effective | bool
         - governed_trace_file_content is defined
     - name: Parse governed AI and MCP trace records
       ansible.builtin.set_fact:
@@ -339,7 +353,91 @@
       loop: "{{ governed_trace_lines | default([]) }}"
       no_log: true
       when:
-        - ai_debug_trace_effective | bool
+        - ai_trace_capture_enabled_effective | bool
+
+    - name: Collect raw Model response trace records
+      ansible.builtin.set_fact:
+        governed_model_response_records: >-
+          {{
+            (governed_model_response_records | default([]))
+            + [item]
+          }}
+      loop: "{{ governed_trace_records | default([]) }}"
+      loop_control:
+        label: "{{ item.stage | default('unknown') }}"
+      no_log: true
+      when:
+        - ai_show_model_responses_effective | bool
+        - item.stage | default('') in ['model_plan_output', 'model_final_output']
+
+    - name: Show raw Model responses for comparison
+      ansible.builtin.debug:
+        msg:
+          response_stage: "{{ item.stage | default('unknown') }}"
+          requested_model: "{{ ai_model_effective }}"
+          provider_model: >-
+            {{
+              (
+                item.data.response
+                | default({})
+              ).model
+              | default('')
+            }}
+          round: "{{ item.data.round | default('') }}"
+          attempt: "{{ item.data.attempt | default('') }}"
+          http_status: "{{ item.data.http_status | default('') }}"
+          finish_reason: >-
+            {{
+              (
+                item.data.response
+                | default({})
+              ).choices[0].finish_reason
+              | default('')
+            }}
+          reasoning_content: >-
+            {{
+              (
+                item.data.response
+                | default({})
+              ).choices[0].message.reasoning_content
+              | default('')
+            }}
+          content: >-
+            {{
+              (
+                item.data.response
+                | default({})
+              ).choices[0].message.content
+              | default('')
+            }}
+          tool_calls: >-
+            {{
+              (
+                item.data.response
+                | default({})
+              ).choices[0].message.tool_calls
+              | default([])
+            }}
+          usage: >-
+            {{
+              (
+                item.data.response
+                | default({})
+              ).usage
+              | default({})
+            }}
+          raw_response: "{{ item.data.response | default(item.data, true) }}"
+      loop: "{{ governed_model_response_records | default([]) }}"
+      loop_control:
+        label: >-
+          {{
+            (item.stage | default('unknown'))
+            ~ '-round-'
+            ~ (item.data.round | default('n/a') | string)
+          }}
+      when:
+        - ai_show_model_responses_effective | bool
+
     - name: Show governed Model and MCP trace details
       ansible.builtin.debug:
         msg:
@@ -356,7 +454,7 @@
         path: "{{ governed_trace_file.path }}"
         state: absent
       when:
-        - ai_debug_trace_effective | bool
+        - ai_trace_capture_enabled_effective | bool
         - governed_trace_file is defined
     - name: Store governed adapter response
       ansible.builtin.set_fact:
@@ -416,6 +514,7 @@
           cve_radar_http_path: "{{ trigger_observation.http_path }}"
           cve_radar_effective_source_ip: "{{ trigger_observation.effective_source_ip }}"
           cve_radar_ai_backend_mode: "{{ ai_backend_mode_effective }}"
+          cve_radar_ai_model: "{{ ai_model_effective }}"
           cve_radar_ai_assessment: "{{ ai_final_result.assessment }}"
           cve_radar_ai_incident_type: "{{ ai_final_result.incident_type | default('unknown') }}"
           cve_radar_ai_confidence: "{{ ai_final_result.confidence | float }}"
@@ -435,6 +534,7 @@
         msg:
           investigation_id: "{{ ai_investigation_request.request_id }}"
           ai_backend_mode: "{{ ai_backend_mode_effective }}"
+          ai_model: "{{ ai_model_effective }}"
           ai_model_url: "{{ ai_model_url_effective }}"
           rhel_mcp_url: "{{ rhel_mcp_url_effective }}"
           target_host: "{{ trigger_observation.collector.hostname }}"
