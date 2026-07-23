@@ -1,6 +1,0 @@
-gcc [platform:rpm]
-make [platform:rpm]
-redhat-rpm-config [platform:rpm]
-pkgconf-pkg-config [platform:rpm]
-systemd-devel [platform:rpm]
-python3.12-devel [platform:rpm]
