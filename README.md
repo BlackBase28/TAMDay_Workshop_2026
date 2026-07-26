@@ -1,6 +1,6 @@
 # TAM Day CVE Radar Workshop
 
-Version: `1.9.5-slim28`
+Version: `1.9.5-slim28-debug1`
 
 本專案提供 TAM Day Workshop 使用的 AAP / EDA / AI Runtime，示範事件偵測、
 AI 分析、RHEL MCP 蒐證、受控修復與 ntfy 通知。
@@ -63,3 +63,14 @@ ntfy 會直接使用該 AI 分析結果作為通知內容。
 ```bash
 ./tests/verify_project.sh
 ```
+
+## AI 分析結果確認
+
+AI Analysis 執行後，可在 Job Output 搜尋：
+
+```text
+Show workflow review summary
+```
+
+此區塊會顯示準備傳給後續 Workflow 的 AI 判斷摘要，以及 assessment、confidence、reason、evidence_summary 與 recommended_next_step。
+

@@ -58,7 +58,9 @@ test -f "$root/playbooks/templates/ntfy_payload.json.j2"
 find "$root" -type d -name __pycache__ -prune -exec rm -rf {} +
 find "$root" -type f -name '*.pyc' -delete
 
-echo "OK: Workshop 1.9.5-slim28 GitHub-based slim runtime with standalone ntfy"
+echo "OK: Workshop 1.9.5-slim28-debug1 GitHub-based slim runtime with standalone ntfy"
 
 grep -Eq '^  rhel_mcp_url: ""$' "$root/playbooks/vars/ai_risk_analysis_defaults.yml"
 grep -q 'rhel_mcp_url_effective | trim | length > 0' "$root/playbooks/eda_ai_risk_analysis.yml"
+
+grep -q 'Show workflow review summary' "$root/playbooks/eda_ai_risk_analysis.yml"

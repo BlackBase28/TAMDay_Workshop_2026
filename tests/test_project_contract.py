@@ -112,6 +112,15 @@ class ProjectContractTests(unittest.TestCase):
         self.assertNotIn("已移除", readme)
         self.assertLess(len(readme.splitlines()), 90)
 
+    def test_workflow_review_summary_is_visible_in_job_output(self) -> None:
+        self.assertIn("- name: Show workflow review summary", self.ai_text)
+        self.assertIn("workflow_review_summary:", self.ai_text)
+        self.assertIn("assessment:", self.ai_text)
+        self.assertIn("confidence:", self.ai_text)
+        self.assertIn("reason:", self.ai_text)
+        self.assertIn("evidence_summary:", self.ai_text)
+        self.assertIn("recommended_next_step:", self.ai_text)
+
     def test_model_credential_contract(self) -> None:
         self.assertIn("lookup('ansible.builtin.env', 'AI_RISK_WEBHOOK_TOKEN')", self.ai_text)
         for name in ("AI_MODEL_URL", "AI_API_TOKEN", "AI_API_KEY", "LITELLM_API_KEY", "OPENAI_API_KEY"):
@@ -312,7 +321,7 @@ class ProjectContractTests(unittest.TestCase):
         self.assertIn('cve_radar_collector_hostname: "{{ inventory_hostname }}"', defaults)
         self.assertIn('COLLECTOR_HOSTNAME={{ cve_radar_collector_hostname | trim | quote }}', env_template)
         self.assertIn('${COLLECTOR_HOSTNAME:-$(hostname -f', helper)
-        self.assertIn('VERSION = "1.9.5-slim28"', self.forwarder_text)
+        self.assertIn('VERSION = "1.9.5-slim28-debug1"', self.forwarder_text)
 
 
     def test_acl_mask_recalculation_uses_supported_enum(self):
