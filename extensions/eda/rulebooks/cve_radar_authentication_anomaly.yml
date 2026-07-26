@@ -42,8 +42,16 @@
                 {{ event.payload.handoff.repair_branch | default('main') }}
               remediation_repair_commit: >-
                 {{ event.payload.handoff.repair_commit | default('') }}
+              ai_model: "{{ event.payload.model | default('') }}"
+              ai_assessment: "{{ event.payload.assessment }}"
+              ai_incident_type: "{{ event.payload.incident_type }}"
+              ai_severity: "{{ event.payload.severity | default('medium') }}"
               ai_confidence: "{{ event.payload.confidence }}"
               ai_reason: "{{ event.payload.reason | default('') }}"
+              ai_evidence_summary: "{{ event.payload.evidence_summary | default([]) }}"
+              ai_recommended_next_step: "{{ event.payload.recommended_next_step }}"
+              workflow_review_summary: >-
+                {{ event.payload.workflow_review_summary | default('') }}
 
     - name: Route AI proposal to suspicious login review Workflow
       condition: >-
@@ -84,11 +92,14 @@
                 {{ event.payload.trigger_context.success_at | default('') }}
               post_login_harmful_activity_observed: >-
                 {{ event.payload.review.post_login_harmful_activity_observed | default(false) }}
+              ai_model: "{{ event.payload.model | default('') }}"
               ai_assessment: "{{ event.payload.assessment }}"
               ai_incident_type: "{{ event.payload.incident_type }}"
+              ai_severity: "{{ event.payload.severity | default('medium') }}"
               ai_confidence: "{{ event.payload.confidence }}"
               ai_reason: "{{ event.payload.reason | default('') }}"
               ai_evidence_summary: "{{ event.payload.evidence_summary | default([]) }}"
+              ai_recommended_next_step: "{{ event.payload.recommended_next_step }}"
               workflow_review_summary: >-
                 {{ event.payload.workflow_review_summary | default('') }}
               login_failures: >-

@@ -31,11 +31,14 @@
           login_success_at: "{{ login_success_at | default('') }}"
           post_login_harmful_activity_observed: >-
             {{ post_login_harmful_activity_observed | default(false) | bool }}
+          ai_model: "{{ ai_model | default('') }}"
           ai_assessment: "{{ ai_assessment | default('unknown') }}"
           ai_incident_type: "{{ ai_incident_type | default('unknown') }}"
+          ai_severity: "{{ ai_severity | default('medium') }}"
           ai_confidence: "{{ ai_confidence | default(0) | float }}"
           ai_reason: "{{ ai_reason | default('') }}"
           ai_evidence_summary: "{{ ai_evidence_summary | default([]) }}"
+          ai_recommended_next_step: "{{ ai_recommended_next_step | default('') }}"
           workflow_review_summary: "{{ workflow_review_summary | default('') }}"
           login_failures: "{{ login_failures | default([]) }}"
           automatic_account_action: false
@@ -50,7 +53,15 @@
           cve_radar_login_review_investigation_id: "{{ investigation_id }}"
           cve_radar_login_review_target_host: "{{ target_host }}"
           cve_radar_login_review_user: "{{ affected_user }}"
+          workflow_review_summary: "{{ workflow_review_summary | default('') }}"
           cve_radar_login_review_summary: "{{ workflow_review_summary | default('') }}"
+          cve_radar_login_review_ai_model: "{{ ai_model | default('') }}"
+          cve_radar_login_review_ai_assessment: "{{ ai_assessment | default('unknown') }}"
+          cve_radar_login_review_ai_confidence: "{{ ai_confidence | default(0) | float }}"
+          cve_radar_login_review_ai_reason: "{{ ai_reason | default('') }}"
+          cve_radar_login_review_ai_evidence_summary: "{{ ai_evidence_summary | default([]) }}"
+          cve_radar_login_review_ai_recommended_next_step: >-
+            {{ ai_recommended_next_step | default('') }}
           cve_radar_login_review_failures: "{{ login_failures | default([]) }}"
           cve_radar_login_review_requires_human_approval: true
           cve_radar_login_review_automatic_account_action: false

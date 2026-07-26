@@ -32,7 +32,7 @@ class ProjectContractTests(unittest.TestCase):
     def test_git_default_file_contract(self) -> None:
         self.assertEqual(self.defaults["ai_model_url"], "")
         self.assertEqual(self.defaults["ai_model"], "")
-        self.assertEqual(self.defaults["rhel_mcp_url"], "http://192.168.1.110:8000/mcp")
+        self.assertEqual(self.defaults["rhel_mcp_url"], "")
         self.assertFalse(self.defaults["ai_validate_certs"])
         self.assertFalse(self.defaults["rhel_mcp_validate_certs"])
         self.assertEqual(
@@ -74,8 +74,9 @@ class ProjectContractTests(unittest.TestCase):
     def test_model_selection_is_explicit_and_required(self) -> None:
         self.assertIn("- ai_model_url_effective | trim | length > 0", self.ai_text)
         self.assertIn("- ai_model_effective | trim | length > 0", self.ai_text)
+        self.assertIn("- rhel_mcp_url_effective | trim | length > 0", self.ai_text)
         self.assertIn(
-            "Set both\n          ai_model_url and ai_model explicitly",
+            "Set ai_model_url, ai_model, and rhel_mcp_url explicitly",
             self.ai_text,
         )
         self.assertIn('os.getenv("AI_MODEL_URL", "")', self.adapter_text)
@@ -99,6 +100,17 @@ class ProjectContractTests(unittest.TestCase):
             'cve_radar_ai_model: "{{ ai_model_effective }}"',
         ):
             self.assertIn(marker, self.ai_text)
+
+    def test_readme_is_concise_and_user_facing(self) -> None:
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn('rhel_mcp_url: "http://<rhel-mcp-host>:8000/mcp"', readme)
+        self.assertNotIn("024c5440690631cd9a11ddaac7cde2e6bcd526ca", readme)
+        self.assertNotIn("roles_path =", readme)
+        self.assertNotIn("latin-1", readme)
+        self.assertNotIn("Native Jinja", readme)
+        self.assertNotIn("SHA256", readme)
+        self.assertNotIn("已移除", readme)
+        self.assertLess(len(readme.splitlines()), 90)
 
     def test_model_credential_contract(self) -> None:
         self.assertIn("lookup('ansible.builtin.env', 'AI_RISK_WEBHOOK_TOKEN')", self.ai_text)
@@ -245,6 +257,46 @@ class ProjectContractTests(unittest.TestCase):
         self.assertIn("login_failures", self.rulebook_text)
 
 
+    def test_governed_ai_summary_reaches_ntfy_workflow(self) -> None:
+        ntfy = (ROOT / "playbooks/send_ntfy_alert.yml").read_text()
+        for marker in (
+            "'AI 判斷：'",
+            "'｜信心值：'",
+            "'｜原因：'",
+            "'｜證據：'",
+            "'｜建議：'",
+            'model: "{{ ai_model_effective }}"',
+        ):
+            self.assertIn(marker, self.ai_text)
+
+        for marker in (
+            'ai_model: "{{ event.payload.model | default(\'\') }}"',
+            'ai_recommended_next_step: "{{ event.payload.recommended_next_step }}"',
+            "workflow_review_summary:",
+        ):
+            self.assertGreaterEqual(self.rulebook_text.count(marker), 2)
+
+        self.assertIn(
+            'workflow_review_summary: "{{ workflow_review_summary | default(\'\') }}"',
+            self.review_text,
+        )
+        self.assertIn(
+            'cve_radar_login_review_summary: "{{ workflow_review_summary | default(\'\') }}"',
+            self.review_text,
+        )
+        self.assertIn("cve_radar_login_review_summary", ntfy)
+
+    def test_suspicious_login_review_republishes_ai_fields(self) -> None:
+        for marker in (
+            "cve_radar_login_review_ai_model",
+            "cve_radar_login_review_ai_assessment",
+            "cve_radar_login_review_ai_confidence",
+            "cve_radar_login_review_ai_reason",
+            "cve_radar_login_review_ai_evidence_summary",
+            "cve_radar_login_review_ai_recommended_next_step",
+        ):
+            self.assertIn(marker, self.review_text)
+
     def test_forwarder_deployment_uses_aap_connection_credential(self):
         deploy = (ROOT / "playbooks/deploy_forwarder.yml").read_text()
         self.assertNotIn("cve_radar_host_passwords", deploy)
@@ -260,7 +312,7 @@ class ProjectContractTests(unittest.TestCase):
         self.assertIn('cve_radar_collector_hostname: "{{ inventory_hostname }}"', defaults)
         self.assertIn('COLLECTOR_HOSTNAME={{ cve_radar_collector_hostname | trim | quote }}', env_template)
         self.assertIn('${COLLECTOR_HOSTNAME:-$(hostname -f', helper)
-        self.assertIn('VERSION = "1.9.5-slim26"', self.forwarder_text)
+        self.assertIn('VERSION = "1.9.5-slim28"', self.forwarder_text)
 
 
     def test_acl_mask_recalculation_uses_supported_enum(self):

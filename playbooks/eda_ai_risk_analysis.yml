@@ -138,15 +138,15 @@
           - ai_backend_mode | default('governed_adapter') == 'governed_adapter'
           - ai_model_url_effective | trim | length > 0
           - ai_model_effective | trim | length > 0
-          - rhel_mcp_url_effective | length > 0
+          - rhel_mcp_url_effective | trim | length > 0
           - ai_api_token_effective | length > 0
           - ai_timeout_effective | int >= 30
           - rhel_mcp_timeout_effective | int >= 5
         fail_msg: >-
-          This project supports ai_backend_mode=governed_adapter only. Set both
-          ai_model_url and ai_model explicitly in the AI Analysis Job Template,
-          Survey, or launch Extra Variables. Attach the Model credential that
-          injects AI_RISK_WEBHOOK_TOKEN, and configure rhel_mcp_url.
+          Set ai_model_url, ai_model, and rhel_mcp_url explicitly through
+          the AI Analysis Job Template, Credential injector, Survey, or launch
+          Extra Variables. Attach the Model credential that injects
+          AI_RISK_WEBHOOK_TOKEN.
 
     - name: Show safe governed adapter settings
       ansible.builtin.debug:
@@ -524,6 +524,16 @@
           cve_radar_ai_affected_user: "{{ ai_final_result.affected_user | default('') }}"
           cve_radar_ai_source_ips: "{{ ai_final_result.source_ips | default([]) }}"
           cve_radar_ai_evidence_summary: "{{ ai_final_result.evidence_summary | default([]) }}"
+          workflow_review_summary: >-
+            {{
+              'AI 判斷：' ~ (ai_final_result.assessment | default('unknown'))
+              ~ '｜信心值：' ~ (ai_final_result.confidence | default(0) | string)
+              ~ '｜原因：' ~ (ai_final_result.reason | default(''))
+              ~ '｜證據：'
+              ~ (ai_final_result.evidence_summary | default([]) | join('；'))
+              ~ '｜建議：'
+              ~ (ai_final_result.recommended_next_step | default(''))
+            }}
           cve_radar_ai_evidence: "{{ ai_final_result.evidence | default({}) }}"
           cve_radar_ai_governance_policy_applied: >-
             {{ ai_final_result.governance_policy_applied | default([]) }}
@@ -623,6 +633,7 @@
           investigation_id: "{{ ai_investigation_request.request_id }}"
           parent_event_id: "{{ trigger_observation.event_id }}"
           target_host: "{{ trigger_observation.collector.hostname }}"
+          model: "{{ ai_model_effective }}"
           assessment: "{{ ai_final_result.assessment }}"
           incident_type: "{{ ai_final_result.incident_type | default('unknown') }}"
           confidence: "{{ ai_final_result.confidence | default(0) | float }}"
@@ -634,8 +645,13 @@
           evidence_summary: "{{ ai_final_result.evidence_summary | default([]) }}"
           workflow_review_summary: >-
             {{
-              '[' ~ ai_investigation_request.request_id ~ '] '
+              'AI 判斷：' ~ (ai_final_result.assessment | default('unknown'))
+              ~ '｜信心值：' ~ (ai_final_result.confidence | default(0) | string)
+              ~ '｜原因：' ~ (ai_final_result.reason | default(''))
+              ~ '｜證據：'
               ~ (ai_final_result.evidence_summary | default([]) | join('；'))
+              ~ '｜建議：'
+              ~ (ai_final_result.recommended_next_step | default(''))
             }}
           governance_policy_applied: >-
             {{ ai_final_result.governance_policy_applied | default([]) }}

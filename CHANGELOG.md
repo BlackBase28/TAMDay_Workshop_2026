@@ -1,6 +1,34 @@
 # Changelog
 
-## 1.9.5-slim26
+## 1.9.5-slim28
+
+- Remove the default `rhel_mcp_url`; the MCP endpoint must be provided
+  explicitly by AAP Job Template, Credential injector, Survey, or launch
+  variables.
+- Keep the AI Analysis preflight validation so a missing MCP URL fails clearly.
+- Simplify README for workshop users and remove maintenance/source/debug
+  implementation details.
+- Preserve slim27 governed AI result handoff to ntfy.
+
+
+## 1.9.5-slim28
+
+- Carry the governed AI judgment end-to-end to downstream notification nodes.
+- Expand `workflow_review_summary` to include assessment, confidence, reason,
+  evidence summary, and recommended next step.
+- Include the selected AI model in the governed Decision Event.
+- Pass AI model, assessment, incident type, severity, confidence, reason,
+  evidence summary, recommended next step, and `workflow_review_summary`
+  through both EDA Workflow routes.
+- Re-publish `workflow_review_summary` from
+  `playbooks/suspicious_login_review.yml` with `set_stats`.
+- Add `cve_radar_login_review_summary` as an ntfy fallback so the AI result is
+  retained even when Workflow variable propagation differs by AAP launch path.
+- Preserve slim26 ntfy UTF-8/template-file transport and all existing governed
+  MCP controls.
+
+
+## 1.9.5-slim28
 
 - Fix Ansible Native Jinja converting `ntfy_payload_json` back into a dict,
   which caused `from_json` to fail with `the JSON object must be str, bytes or
@@ -14,7 +42,7 @@
   fields.
 
 
-## 1.9.5-slim26
+## 1.9.5-slim28
 
 - Fix ntfy HTTP 400 `request body must be valid JSON` errors.
 - Stop relying on `ansible.builtin.uri` implicit `body_format: json`
@@ -28,7 +56,7 @@
   support from slim24.
 
 
-## 1.9.5-slim26
+## 1.9.5-slim28
 
 - Fix ntfy failures when Traditional Chinese titles are encoded as HTTP
   headers (`'latin-1' codec can't encode characters`).
@@ -41,7 +69,7 @@
 - Preserve slim23 explicit AI Model selection and raw response comparison.
 
 
-## 1.9.5-slim26
+## 1.9.5-slim28
 
 - Remove the Project defaults for `ai_model_url` and `ai_model`; both must be
   selected explicitly by the AI Analysis Job Template or launch.
@@ -55,7 +83,7 @@
   governed MCP controls, and corrected dual Role paths.
 
 
-## 1.9.5-slim26
+## 1.9.5-slim28
 
 - 以 GitHub `main` commit `024c5440690631cd9a11ddaac7cde2e6bcd526ca`
   與版本 `1.9.5-slim17` 作為來源基準。

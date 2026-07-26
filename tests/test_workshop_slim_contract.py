@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class WorkshopSlimContractTests(unittest.TestCase):
     def test_version_and_source_base(self):
-        self.assertEqual((ROOT / "VERSION").read_text().strip(), "1.9.5-slim26")
+        self.assertEqual((ROOT / "VERSION").read_text().strip(), "1.9.5-slim28")
         source = (ROOT / "SOURCE_BASE.md").read_text()
         self.assertIn("024c5440690631cd9a11ddaac7cde2e6bcd526ca", source)
         self.assertIn("1.9.5-slim17", source)
@@ -72,6 +72,7 @@ class WorkshopSlimContractTests(unittest.TestCase):
         self.assertIn('src: "{{ ntfy_payload_tempfile.path }}"', playbook)
         self.assertIn("method: POST", playbook)
         self.assertIn("workflow_review_summary", playbook)
+        self.assertIn("cve_radar_login_review_summary", playbook)
         self.assertIn('"message": {{ ntfy_message_effective', template)
         self.assertNotIn("roles:", playbook)
         self.assertNotIn("kernel_cve_radar_remediation_action", playbook)

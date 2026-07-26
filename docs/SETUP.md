@@ -398,3 +398,49 @@ the JSON object must be str, bytes or bytearray, not dict
 ```
 
 The temporary file is removed in an `always` block.
+
+
+## Pass the governed AI result to ntfy
+
+For the suspicious login flow, use this Workflow order:
+
+```text
+CVE Radar - Suspicious Login Review
+    |
+    +-- CVE Radar - Record Suspicious Login Review
+            |
+            +-- success --> CVE Radar - Send ntfy Alert
+```
+
+Do not set `ntfy_message` on the ntfy Job Template or Workflow node. The
+message is carried through this chain:
+
+```text
+AI Analysis
+  -> Decision Event.workflow_review_summary
+  -> EDA Rulebook Workflow Extra Variables
+  -> suspicious_login_review.yml set_stats
+  -> send_ntfy_alert.yml
+```
+
+The AI summary contains the governed result:
+
+```text
+AI 判斷：suspicious
+｜信心值：0.94
+｜原因：最近五分鐘發現多次登入失敗後成功登入
+｜證據：admin 最近五分鐘有 3 次登入失敗
+｜建議：require_approval
+```
+
+`send_ntfy_alert.yml` uses this precedence:
+
+```text
+ntfy_message
+-> workflow_review_summary
+-> cve_radar_login_review_summary
+-> Kernel CVE Radar workflow notification.
+```
+
+Therefore leave `ntfy_message` undefined when you want the notification to show
+the AI result.

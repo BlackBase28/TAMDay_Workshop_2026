@@ -11,7 +11,11 @@
         ntfy_message
         | default(
             workflow_review_summary
-            | default('Kernel CVE Radar workflow notification.', true),
+            | default(
+                cve_radar_login_review_summary
+                | default('Kernel CVE Radar workflow notification.', true),
+                true
+              ),
             true
           )
       }}
