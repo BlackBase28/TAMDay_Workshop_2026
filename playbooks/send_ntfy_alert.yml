@@ -6,18 +6,45 @@
   become: false
 
   vars:
+    ntfy_eda_workflow_review_summary: >-
+      {{
+        (ansible_eda | default({}))
+        .get('event', {})
+        .get('payload', {})
+        .get('workflow_review_summary', '')
+      }}
     ntfy_message_effective: >-
       {{
         ntfy_message
         | default(
             workflow_review_summary
             | default(
-                cve_radar_login_review_summary
-                | default('Kernel CVE Radar workflow notification.', true),
+                ntfy_eda_workflow_review_summary
+                | default(
+                    cve_radar_login_review_summary
+                    | default('Kernel CVE Radar workflow notification.', true),
+                    true
+                  ),
                 true
               ),
             true
           )
+      }}
+    ntfy_message_source: >-
+      {{
+        'ntfy_message'
+        if (ntfy_message | default('', true) | string | length > 0)
+        else
+        'workflow_review_summary'
+        if (workflow_review_summary | default('', true) | string | length > 0)
+        else
+        'ansible_eda.event.payload.workflow_review_summary'
+        if (ntfy_eda_workflow_review_summary | string | length > 0)
+        else
+        'cve_radar_login_review_summary'
+        if (cve_radar_login_review_summary | default('', true) | string | length > 0)
+        else
+        'generic_fallback'
       }}
     ntfy_title_effective: >-
       {{ ntfy_title | default('Kernel CVE Radar', true) }}
@@ -48,6 +75,19 @@
       {{ ntfy_no_log | default(true) | bool }}
 
   tasks:
+    - name: Show ntfy AI message handoff status
+      ansible.builtin.debug:
+        msg:
+          message_source: "{{ ntfy_message_source }}"
+          workflow_review_summary_present: >-
+            {{ workflow_review_summary | default('', true) | string | length > 0 }}
+          eda_event_summary_present: >-
+            {{ ntfy_eda_workflow_review_summary | string | length > 0 }}
+          review_artifact_summary_present: >-
+            {{ cve_radar_login_review_summary | default('', true) | string | length > 0 }}
+          message_preview: >-
+            {{ ntfy_message_effective | string | truncate(500, true, '...') }}
+
     - name: Normalize ntfy topic URL
       ansible.builtin.set_fact:
         ntfy_url_normalized: >-
@@ -148,6 +188,7 @@
         msg:
           topic: "{{ ntfy_topic_effective }}"
           title: "{{ ntfy_title_effective }}"
+          message_source: "{{ ntfy_message_source }}"
           priority: "{{ ntfy_priority_name_effective }}"
           response_id: "{{ ntfy_publish_result.json.id | default('') }}"
           status: "{{ ntfy_publish_result.status | default('') }}"

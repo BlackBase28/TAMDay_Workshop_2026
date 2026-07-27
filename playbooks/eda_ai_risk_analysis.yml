@@ -539,27 +539,6 @@
             {{ ai_final_result.governance_policy_applied | default([]) }}
           cve_radar_ai_mcp_tools_used: "{{ ai_final_result.mcp_tools_used | default([]) }}"
         per_host: false
-
-    - name: Show workflow review summary
-      ansible.builtin.debug:
-        msg:
-          workflow_review_summary: >-
-            {{
-              'AI 判斷：' ~ (ai_final_result.assessment | default('unknown'))
-              ~ '｜信心值：' ~ (ai_final_result.confidence | default(0) | string)
-              ~ '｜原因：' ~ (ai_final_result.reason | default(''))
-              ~ '｜證據：'
-              ~ (ai_final_result.evidence_summary | default([]) | join('；'))
-              ~ '｜建議：'
-              ~ (ai_final_result.recommended_next_step | default(''))
-            }}
-          assessment: "{{ ai_final_result.assessment | default('unknown') }}"
-          confidence: "{{ ai_final_result.confidence | default(0) }}"
-          reason: "{{ ai_final_result.reason | default('') }}"
-          evidence_summary: "{{ ai_final_result.evidence_summary | default([]) }}"
-          recommended_next_step: >-
-            {{ ai_final_result.recommended_next_step | default('') }}
-
     - name: Show safe investigation summary
       ansible.builtin.debug:
         msg:
