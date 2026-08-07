@@ -74,6 +74,24 @@ WRITE_LIKE_PATTERNS = re.compile(
 )
 JSON_OBJECT_RE = re.compile(r"\{.*\}", re.DOTALL)
 THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
+TRANSIENT_MCP_FAILURE_RE = re.compile(
+    r"("
+    r"ssh connection closed|connection (?:was )?closed|connection reset(?: by peer)?|"
+    r"broken pipe|timed? out|timeout|all connection attempts failed|"
+    r"server disconnected|remote protocol error|connection refused|"
+    r"temporarily unavailable|channel(?: \d+)? (?:is )?closed|"
+    r"unexpected eof|eof while|network is unreachable|no route to host"
+    r")",
+    re.IGNORECASE,
+)
+NON_RETRYABLE_MCP_FAILURE_RE = re.compile(
+    r"("
+    r"authorization denied|permission denied|access denied|forbidden|unauthorized|"
+    r"invalid arguments?|validation error|unknown tool|tool .* not found|"
+    r"command not found|not in the governed allowlist|different host"
+    r")",
+    re.IGNORECASE,
+)
 
 
 def as_bool(value: str | None, default: bool = True) -> bool:
@@ -108,6 +126,39 @@ def configured_allowed_tools() -> set[str]:
     if not raw:
         return set(DEFAULT_ALLOWED_MCP_TOOLS)
     return {item.strip() for item in raw.split(",") if item.strip()}
+
+
+def configured_mcp_tool_retry_policy() -> dict[str, float | int]:
+    """Return bounded retry settings for transient MCP/SSH tool failures.
+
+    ``max_retries`` counts additional attempts after the first MCP tool call.
+    The wrapper deliberately keeps retries small so a persistent permission,
+    policy, or command problem still fails closed quickly.
+    """
+    return {
+        "max_retries": bounded_int(
+            os.getenv("GOVERNED_MCP_TOOL_MAX_RETRIES"), 2, 0, 5
+        ),
+        "retry_delay_seconds": bounded_float(
+            os.getenv("GOVERNED_MCP_TOOL_RETRY_DELAY_SECONDS"), 1.5, 0.0, 30.0
+        ),
+        "max_retry_delay_seconds": bounded_float(
+            os.getenv("GOVERNED_MCP_TOOL_MAX_RETRY_DELAY_SECONDS"), 8.0, 0.0, 60.0
+        ),
+    }
+
+
+def is_retryable_mcp_failure(error: BaseException | str) -> bool:
+    """Classify only transport-like MCP/SSH failures as retryable.
+
+    Linux MCP can return SSH failures inside a normal ``isError`` tool result,
+    for example while locating ``tail``.  Permission and policy failures are
+    intentionally non-retryable.
+    """
+    text = str(error or "")
+    if NON_RETRYABLE_MCP_FAILURE_RE.search(text):
+        return False
+    return bool(TRANSIENT_MCP_FAILURE_RE.search(text))
 
 
 def configured_evidence_loop() -> dict[str, Any]:
@@ -1683,6 +1734,112 @@ def ensure_admin_login_auth_log_plan(
     return [required_call, *plan_calls], True
 
 
+async def call_mcp_tool_with_retry(
+    session: Any,
+    tool_name: str,
+    arguments: dict[str, Any],
+) -> tuple[Any, int]:
+    """Execute one complete MCP tool call with bounded transient retries.
+
+    Retrying ``session.call_tool`` causes Linux MCP Server to perform a fresh
+    remote command attempt, including a new SSH command path.  The adapter does
+    not retry authorization, permission, policy, invalid-argument, or genuine
+    command-not-found failures.
+    """
+    policy = configured_mcp_tool_retry_policy()
+    max_retries = int(policy["max_retries"])
+    base_delay = float(policy["retry_delay_seconds"])
+    max_delay = float(policy["max_retry_delay_seconds"])
+    max_attempts = max_retries + 1
+
+    for attempt in range(1, max_attempts + 1):
+        try:
+            result = await session.call_tool(tool_name, arguments)
+        except BaseException as exc:
+            if isinstance(exc, (KeyboardInterrupt, SystemExit)):
+                raise
+            retryable = is_retryable_mcp_failure(exc)
+            if retryable and attempt < max_attempts:
+                delay = min(max_delay, base_delay * (2 ** (attempt - 1)))
+                emit_trace(
+                    "mcp_tool_retry",
+                    {
+                        "tool": tool_name,
+                        "attempt": attempt,
+                        "max_attempts": max_attempts,
+                        "next_attempt": attempt + 1,
+                        "delay_seconds": delay,
+                        "failure_source": "exception",
+                        "error_type": type(exc).__name__,
+                        "error": str(exc)[:600],
+                    },
+                )
+                await asyncio.sleep(delay)
+                continue
+            if retryable:
+                emit_trace(
+                    "mcp_tool_retry_exhausted",
+                    {
+                        "tool": tool_name,
+                        "attempts": attempt,
+                        "error_type": type(exc).__name__,
+                        "error": str(exc)[:600],
+                    },
+                )
+            raise
+
+        result_preview = serialize_tool_result(result, limit=1200)
+        if not bool(getattr(result, "isError", False)):
+            retry_count = attempt - 1
+            if retry_count:
+                emit_trace(
+                    "mcp_tool_retry_succeeded",
+                    {
+                        "tool": tool_name,
+                        "attempts": attempt,
+                        "retry_count": retry_count,
+                    },
+                )
+            return result, retry_count
+
+        error_message = (
+            f"RHEL MCP tool {tool_name} returned an error result: "
+            f"{result_preview[:1000]}"
+        )
+        retryable = is_retryable_mcp_failure(error_message)
+        if retryable and attempt < max_attempts:
+            delay = min(max_delay, base_delay * (2 ** (attempt - 1)))
+            emit_trace(
+                "mcp_tool_retry",
+                {
+                    "tool": tool_name,
+                    "attempt": attempt,
+                    "max_attempts": max_attempts,
+                    "next_attempt": attempt + 1,
+                    "delay_seconds": delay,
+                    "failure_source": "tool_error_result",
+                    "error": error_message[:600],
+                },
+            )
+            await asyncio.sleep(delay)
+            continue
+        if retryable:
+            emit_trace(
+                "mcp_tool_retry_exhausted",
+                {
+                    "tool": tool_name,
+                    "attempts": attempt,
+                    "error": error_message[:600],
+                },
+            )
+            raise RuntimeError(
+                f"{error_message} after {attempt} attempt(s)"
+            )
+        raise RuntimeError(error_message)
+
+    raise RuntimeError(f"RHEL MCP tool {tool_name} retry loop ended unexpectedly")
+
+
 async def _execute_plan_calls(
     *,
     session: Any,
@@ -1774,14 +1931,11 @@ async def _execute_plan_calls(
         completed_queries.add(fingerprint)
         executed += 1
         try:
-            result = await session.call_tool(original_name, governed_args)
+            result, mcp_tool_retry_count = await call_mcp_tool_with_retry(
+                session, original_name, governed_args
+            )
             result_limit = configured_evidence_limits()["tool_result_max_chars"]
             serialized_result = serialize_tool_result(result, result_limit)
-            if bool(getattr(result, "isError", False)):
-                raise RuntimeError(
-                    f"RHEL MCP tool {original_name} returned an error result: "
-                    f"{serialized_result[:600]}"
-                )
             if policy_applied.get("tail_only"):
                 serialized_result = tail_text(
                     serialized_result,
@@ -1804,6 +1958,7 @@ async def _execute_plan_calls(
                 "tool": original_name,
                 "arguments": governed_args,
                 "policy_applied": policy_applied,
+                "mcp_tool_retry_count": mcp_tool_retry_count,
                 "result": serialized_result,
             }
             if original_name == "read_log_file":
@@ -2017,6 +2172,7 @@ async def run_governed_investigation(request: dict[str, Any]) -> dict[str, Any]:
             "allowed_tools": sorted(allowed_tools),
             "log_read_policy": log_policy,
             "evidence_loop": loop_policy,
+            "mcp_tool_retry_policy": configured_mcp_tool_retry_policy(),
         },
     )
 

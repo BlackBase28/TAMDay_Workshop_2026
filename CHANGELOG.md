@@ -1,14 +1,18 @@
 # Changelog
 
-## 1.9.5-slim28-event1
+## 1.9.5-slim28-mcpretry1
 
-- Based on `1.9.5-slim28`.
-- Web remediation routing now uses `include_events: true`.
-- Only remediation/control variables remain explicit in Workflow launch `extra_vars`.
-- The full AI Decision Event is carried under `ansible_eda.event`.
-- ntfy can use `ansible_eda.event.payload.workflow_review_summary` as the AI message.
-- ntfy Job Output now shows the selected message source and a short preview.
-- Suspicious-login routing is unchanged.
+- Based strictly on `1.9.5-slim28`; event1 routing changes are not included.
+- Add a bounded retry wrapper around complete RHEL MCP tool calls.
+- Retry transient SSH/MCP failures such as `SSH connection closed`, timeout,
+  connection reset, broken pipe, and temporary connection failures.
+- Default to 2 additional attempts with exponential backoff from 1.5 seconds,
+  capped at 8 seconds.
+- Do not retry authorization, permission, policy, invalid-argument, unknown-tool,
+  or genuine command-not-found failures.
+- Add `mcp_tool_retry`, `mcp_tool_retry_succeeded`, and
+  `mcp_tool_retry_exhausted` trace records.
+- Record `mcp_tool_retry_count` with successful MCP evidence.
 
 
 ## 1.9.5-slim28

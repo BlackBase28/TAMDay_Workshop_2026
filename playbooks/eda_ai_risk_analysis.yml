@@ -30,6 +30,12 @@
       {{ rhel_mcp_timeout | default(cve_radar_ai_defaults.rhel_mcp_timeout) | int }}
     rhel_mcp_sse_read_timeout_effective: >-
       {{ rhel_mcp_sse_read_timeout | default(cve_radar_ai_defaults.rhel_mcp_sse_read_timeout) | int }}
+    rhel_mcp_tool_max_retries_effective: >-
+      {{ rhel_mcp_tool_max_retries | default(cve_radar_ai_defaults.rhel_mcp_tool_max_retries) | int }}
+    rhel_mcp_tool_retry_delay_seconds_effective: >-
+      {{ rhel_mcp_tool_retry_delay_seconds | default(cve_radar_ai_defaults.rhel_mcp_tool_retry_delay_seconds) | float }}
+    rhel_mcp_tool_max_retry_delay_seconds_effective: >-
+      {{ rhel_mcp_tool_max_retry_delay_seconds | default(cve_radar_ai_defaults.rhel_mcp_tool_max_retry_delay_seconds) | float }}
 
     governed_evidence_loop_enabled_effective: >-
       {{ governed_evidence_loop_enabled | default(cve_radar_ai_defaults.governed_evidence_loop_enabled) | bool }}
@@ -158,6 +164,8 @@
           rhel_mcp_url: "{{ rhel_mcp_url_effective }}"
           ai_validate_certs: "{{ ai_validate_certs_effective }}"
           rhel_mcp_validate_certs: "{{ rhel_mcp_validate_certs_effective }}"
+          mcp_tool_max_retries: "{{ rhel_mcp_tool_max_retries_effective }}"
+          mcp_tool_retry_delay_seconds: "{{ rhel_mcp_tool_retry_delay_seconds_effective }}"
           evidence_rounds: "{{ governed_max_investigation_rounds_effective }}"
           tool_calls_per_round: "{{ governed_max_tool_calls_per_round_effective }}"
           total_tool_calls: "{{ governed_max_total_tool_calls_effective }}"
@@ -291,6 +299,11 @@
         RHEL_MCP_VALIDATE_CERTS: "{{ rhel_mcp_validate_certs_effective | string | lower }}"
         RHEL_MCP_TIMEOUT: "{{ rhel_mcp_timeout_effective }}"
         RHEL_MCP_SSE_READ_TIMEOUT: "{{ rhel_mcp_sse_read_timeout_effective }}"
+        GOVERNED_MCP_TOOL_MAX_RETRIES: "{{ rhel_mcp_tool_max_retries_effective }}"
+        GOVERNED_MCP_TOOL_RETRY_DELAY_SECONDS: >-
+          {{ rhel_mcp_tool_retry_delay_seconds_effective }}
+        GOVERNED_MCP_TOOL_MAX_RETRY_DELAY_SECONDS: >-
+          {{ rhel_mcp_tool_max_retry_delay_seconds_effective }}
         GOVERNED_EVIDENCE_LOOP_ENABLED: "{{ governed_evidence_loop_enabled_effective | string | lower }}"
         GOVERNED_MAX_INVESTIGATION_ROUNDS: "{{ governed_max_investigation_rounds_effective }}"
         GOVERNED_MAX_TOOL_CALLS_PER_ROUND: "{{ governed_max_tool_calls_per_round_effective }}"

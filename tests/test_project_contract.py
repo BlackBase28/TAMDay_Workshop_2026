@@ -44,6 +44,9 @@ class ProjectContractTests(unittest.TestCase):
         self.assertEqual(self.defaults["governed_error_log_tail_lines"], 30)
         self.assertEqual(self.defaults["governed_max_evidence_chars"], 12000)
         self.assertEqual(self.defaults["ai_model_max_retries"], 1)
+        self.assertEqual(self.defaults["rhel_mcp_tool_max_retries"], 2)
+        self.assertEqual(self.defaults["rhel_mcp_tool_retry_delay_seconds"], 1.5)
+        self.assertEqual(self.defaults["rhel_mcp_tool_max_retry_delay_seconds"], 8)
         self.assertTrue(self.defaults["ai_show_model_responses"])
         self.assertTrue(self.defaults["ai_decision_event_enabled"])
         self.assertFalse(self.defaults["ai_decision_event_dry_run"])
@@ -83,6 +86,20 @@ class ProjectContractTests(unittest.TestCase):
         self.assertIn('os.getenv("AI_MODEL", "")', self.adapter_text)
         self.assertIn('"AI_MODEL is not configured"', self.adapter_text)
         self.assertNotIn("qwen3-14b", self.adapter_text)
+
+    def test_mcp_tool_retry_wrapper_contract(self) -> None:
+        for marker in (
+            "call_mcp_tool_with_retry",
+            "is_retryable_mcp_failure",
+            "GOVERNED_MCP_TOOL_MAX_RETRIES",
+            "GOVERNED_MCP_TOOL_RETRY_DELAY_SECONDS",
+            "GOVERNED_MCP_TOOL_MAX_RETRY_DELAY_SECONDS",
+            "mcp_tool_retry",
+            "mcp_tool_retry_succeeded",
+            "mcp_tool_retry_exhausted",
+            "mcp_tool_retry_count",
+        ):
+            self.assertIn(marker, self.adapter_text + self.ai_text)
 
     def test_raw_model_response_comparison_output(self) -> None:
         for marker in (
@@ -163,29 +180,6 @@ class ProjectContractTests(unittest.TestCase):
             self.assertIn(f"{variable} | default('{default}')", self.rulebook_text)
         activation_vars = yaml.safe_load((ROOT / "examples/rulebook_activation_vars.yml").read_text())
         self.assertEqual(activation_vars, expected)
-
-    def test_web_remediation_uses_complete_eda_event(self) -> None:
-        rules = self.rulebook_data[0]["rules"]
-        by_name = {rule["name"]: rule for rule in rules}
-        action = by_name[
-            "Route AI proposal to governed web remediation Workflow"
-        ]["action"]["run_workflow_template"]
-        self.assertTrue(action["include_events"])
-        self.assertEqual(
-            set(action["job_args"]["extra_vars"]),
-            {
-                "target_host",
-                "investigation_id",
-                "remediation_action",
-                "remediation_web_source_variant",
-                "remediation_repair_branch",
-                "remediation_repair_commit",
-            },
-        )
-        ntfy = (ROOT / "playbooks/send_ntfy_alert.yml").read_text()
-        self.assertIn("Show ntfy AI message handoff status", ntfy)
-        self.assertIn("message_source:", ntfy)
-        self.assertIn("message_preview:", ntfy)
 
     def test_review_workflow_does_not_inherit_target_limit(self) -> None:
         review_route = self.rulebook_text.split(
@@ -292,21 +286,13 @@ class ProjectContractTests(unittest.TestCase):
         ):
             self.assertIn(marker, self.ai_text)
 
-        rules = self.rulebook_data[0]["rules"]
-        by_name = {rule["name"]: rule for rule in rules}
-        web_action = by_name[
-            "Route AI proposal to governed web remediation Workflow"
-        ]["action"]["run_workflow_template"]
-        self.assertTrue(web_action["include_events"])
-        self.assertIn(
-            "ansible_eda.event.payload.workflow_review_summary",
-            ntfy,
-        )
+        for marker in (
+            'ai_model: "{{ event.payload.model | default(\'\') }}"',
+            'ai_recommended_next_step: "{{ event.payload.recommended_next_step }}"',
+            "workflow_review_summary:",
+        ):
+            self.assertGreaterEqual(self.rulebook_text.count(marker), 2)
 
-        review_route = by_name[
-            "Route AI proposal to suspicious login review Workflow"
-        ]["action"]["run_workflow_template"]
-        self.assertIn("workflow_review_summary", review_route["job_args"]["extra_vars"])
         self.assertIn(
             'workflow_review_summary: "{{ workflow_review_summary | default(\'\') }}"',
             self.review_text,
@@ -315,6 +301,7 @@ class ProjectContractTests(unittest.TestCase):
             'cve_radar_login_review_summary: "{{ workflow_review_summary | default(\'\') }}"',
             self.review_text,
         )
+        self.assertIn("cve_radar_login_review_summary", ntfy)
 
     def test_suspicious_login_review_republishes_ai_fields(self) -> None:
         for marker in (
@@ -342,7 +329,7 @@ class ProjectContractTests(unittest.TestCase):
         self.assertIn('cve_radar_collector_hostname: "{{ inventory_hostname }}"', defaults)
         self.assertIn('COLLECTOR_HOSTNAME={{ cve_radar_collector_hostname | trim | quote }}', env_template)
         self.assertIn('${COLLECTOR_HOSTNAME:-$(hostname -f', helper)
-        self.assertIn('VERSION = "1.9.5-slim28-event1"', self.forwarder_text)
+        self.assertIn('VERSION = "1.9.5-slim28-mcpretry1"', self.forwarder_text)
 
 
     def test_acl_mask_recalculation_uses_supported_enum(self):

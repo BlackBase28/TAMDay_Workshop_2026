@@ -1,6 +1,6 @@
 # TAM Day CVE Radar Workshop
 
-Version: `1.9.5-slim28-event1`
+Version: `1.9.5-slim28-mcpretry1`
 
 本專案提供 TAM Day Workshop 使用的 AAP / EDA / AI Runtime，示範事件偵測、
 AI 分析、RHEL MCP 蒐證、受控修復與 ntfy 通知。
@@ -64,11 +64,16 @@ ntfy 會直接使用該 AI 分析結果作為通知內容。
 ./tests/verify_project.sh
 ```
 
-## AI 結果通知
+## MCP SSH 暫時性錯誤重試
 
-Web Remediation Workflow 會接收完整的 AI Decision Event。若 ntfy Job Template
-沒有設定 `ntfy_message`，通知會自動使用 AI 產生的 `workflow_review_summary`。
+AI adapter 預設會對 `SSH connection closed`、timeout、connection reset 等
+暫時性 MCP 工具錯誤額外重試 2 次。可從 AI Analysis Job Template 調整：
 
-在 ntfy Job Output 搜尋 `Show ntfy AI message handoff status`，可確認實際使用的
-訊息來源與內容預覽。
+```yaml
+rhel_mcp_tool_max_retries: 2
+rhel_mcp_tool_retry_delay_seconds: 1.5
+rhel_mcp_tool_max_retry_delay_seconds: 8
+```
+
+權限、授權、工具參數與真正的 command-not-found 錯誤不會重試。
 

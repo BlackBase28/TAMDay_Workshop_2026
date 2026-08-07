@@ -27,7 +27,7 @@
         run_workflow_template:
           name: "{{ cve_radar_web_remediation_workflow_name | default('CVE Radar - Governed Web Remediation') }}"
           organization: "{{ cve_radar_aap_organization | default('Default') }}"
-          include_events: true
+          include_events: false
           retries: 2
           delay: 5
           job_args:
@@ -42,6 +42,16 @@
                 {{ event.payload.handoff.repair_branch | default('main') }}
               remediation_repair_commit: >-
                 {{ event.payload.handoff.repair_commit | default('') }}
+              ai_model: "{{ event.payload.model | default('') }}"
+              ai_assessment: "{{ event.payload.assessment }}"
+              ai_incident_type: "{{ event.payload.incident_type }}"
+              ai_severity: "{{ event.payload.severity | default('medium') }}"
+              ai_confidence: "{{ event.payload.confidence }}"
+              ai_reason: "{{ event.payload.reason | default('') }}"
+              ai_evidence_summary: "{{ event.payload.evidence_summary | default([]) }}"
+              ai_recommended_next_step: "{{ event.payload.recommended_next_step }}"
+              workflow_review_summary: >-
+                {{ event.payload.workflow_review_summary | default('') }}
 
     - name: Route AI proposal to suspicious login review Workflow
       condition: >-

@@ -14,6 +14,11 @@ cve_radar_ai_defaults:
   rhel_mcp_validate_certs: false
   rhel_mcp_timeout: 30
   rhel_mcp_sse_read_timeout: 300
+  # Additional attempts after the first MCP tool call. Transient SSH close,
+  # reset, and timeout failures are retried; authorization errors are not.
+  rhel_mcp_tool_max_retries: 2
+  rhel_mcp_tool_retry_delay_seconds: 1.5
+  rhel_mcp_tool_max_retry_delay_seconds: 8
 
   governed_evidence_loop_enabled: true
   governed_max_investigation_rounds: 3

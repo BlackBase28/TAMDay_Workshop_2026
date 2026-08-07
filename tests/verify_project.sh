@@ -58,12 +58,12 @@ test -f "$root/playbooks/templates/ntfy_payload.json.j2"
 find "$root" -type d -name __pycache__ -prune -exec rm -rf {} +
 find "$root" -type f -name '*.pyc' -delete
 
-echo "OK: Workshop 1.9.5-slim28-event1 GitHub-based slim runtime with standalone ntfy"
+echo "OK: Workshop 1.9.5-slim28-mcpretry1 GitHub-based slim runtime with standalone ntfy"
 
 grep -Eq '^  rhel_mcp_url: ""$' "$root/playbooks/vars/ai_risk_analysis_defaults.yml"
 grep -q 'rhel_mcp_url_effective | trim | length > 0' "$root/playbooks/eda_ai_risk_analysis.yml"
 
-grep -q 'include_events: true' "$root/extensions/eda/rulebooks/cve_radar_authentication_anomaly.yml"
-grep -q 'ansible_eda.event.payload.workflow_review_summary' "$root/playbooks/send_ntfy_alert.yml"
-grep -q 'Show ntfy AI message handoff status' "$root/playbooks/send_ntfy_alert.yml"
-grep -q 'message_source' "$root/playbooks/send_ntfy_alert.yml"
+grep -q 'GOVERNED_MCP_TOOL_MAX_RETRIES' "$root/playbooks/eda_ai_risk_analysis.yml"
+grep -q 'call_mcp_tool_with_retry' "$root/playbooks/files/governed_agentic_adapter.py"
+grep -qi 'ssh connection closed' "$root/playbooks/files/governed_agentic_adapter.py"
+grep -q '^  rhel_mcp_tool_max_retries: 2$' "$root/playbooks/vars/ai_risk_analysis_defaults.yml"
